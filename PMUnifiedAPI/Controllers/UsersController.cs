@@ -55,9 +55,15 @@ namespace PMUnifiedAPI.Controllers
             Tokens newToken = new Tokens()
             {
                 UserID = createdUser.Id,
-                Token = TokenHelper.GenerateToken(new Guid().ToString())
+                Token = TokenHelper.GenerateToken(input.username)
+            };
+            Accounts newAccount = new Accounts()
+            {
+                UserID = createdUser.Id,
+                Balance = 1000000.99
             };
             _context.Tokens.Add(newToken);
+            _context.Accounts.Add(newAccount);
             await _context.SaveChangesAsync();
 
             return Ok("User Created");
@@ -112,7 +118,7 @@ namespace PMUnifiedAPI.Controllers
                     user.Salt = salt;
                     _context.Entry(user).State = EntityState.Modified;
 
-                    token.Token = TokenHelper.GenerateToken(new Guid().ToString());
+                    token.Token = TokenHelper.GenerateToken(input.username);
                     _context.Entry(token).State = EntityState.Modified;
 
                     await _context.SaveChangesAsync();

@@ -50,12 +50,12 @@ namespace PMUnifiedAPI.Helpers
             return isValid;
         }
 
-        public static string GenerateToken(string guid)
+        public static string GenerateToken(string username)
         {
             var token = new JwtBuilder()
                 .WithAlgorithm(new HMACSHA256Algorithm())
                 .WithSecret(secret)
-                .AddClaim("sub", guid)
+                .AddClaim("sub", username + Guid.NewGuid().ToString())
                 .Encode();
             return token;
         }

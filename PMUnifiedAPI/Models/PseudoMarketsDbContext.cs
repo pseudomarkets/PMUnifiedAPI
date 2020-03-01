@@ -23,5 +23,8 @@ namespace PMUnifiedAPI.Models
         public DbSet<Users> Users { get; set; }
         public DbSet<Tokens> Tokens { get; set; }
         public DbSet<ApiKeys> ApiKeys { get; set; }
+        public DbSet<Accounts> Accounts { get; set; }
+        public DbSet<Positions> Positions { get; set; }
+        public DbSet<Orders> Orders { get; set; }
     }
 }

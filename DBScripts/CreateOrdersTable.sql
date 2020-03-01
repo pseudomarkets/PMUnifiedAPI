@@ -1,0 +1,25 @@
+USE [C:\USERS\SHRAVAN\DOCUMENTS\PSEUDO MARKETS\PMUNIFIEDAPI\PSEUDOMARKETSDB.MDF]
+GO
+
+/****** Object:  Table [dbo].[Orders]    Script Date: 3/1/2020 12:22:28 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[Orders](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[Symbol] [varchar](20) NOT NULL,
+	[Type] [varchar](5) NOT NULL,
+	[Price] [float] NOT NULL,
+	[Quantity] [int] NOT NULL,
+	[Date] [datetime] NOT NULL,
+	[TransactionID] [varchar](max) NOT NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
