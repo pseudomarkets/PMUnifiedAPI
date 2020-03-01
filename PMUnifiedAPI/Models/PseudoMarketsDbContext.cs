@@ -1,0 +1,27 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+
+/*
+ * Pseudo Markets Unified Web API
+ * Database Context Model for Entity Framework
+ * Author: Shravan Jambukesan <shravan@shravanj.com>
+ * (c) 2019 - 2020 Pseudo Markets
+ */
+
+namespace PMUnifiedAPI.Models
+{
+    public class PseudoMarketsDbContext : DbContext
+    {
+        public PseudoMarketsDbContext(DbContextOptions<PseudoMarketsDbContext> options) : base(options)
+        {
+
+        }
+
+        public DbSet<Users> Users { get; set; }
+        public DbSet<Tokens> Tokens { get; set; }
+        public DbSet<ApiKeys> ApiKeys { get; set; }
+    }
+}
