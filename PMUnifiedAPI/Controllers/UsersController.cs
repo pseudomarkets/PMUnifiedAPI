@@ -67,11 +67,19 @@ namespace PMUnifiedAPI.Controllers
                 _context.Tokens.Add(newToken);
                 _context.Accounts.Add(newAccount);
                 await _context.SaveChangesAsync();
-                return Ok("User Created");
+                StatusOutput output = new StatusOutput()
+                {
+                    message = "User created"
+                };
+                return Ok(output);
             }
             else
             {
-                return Ok("User already exists");
+                StatusOutput output = new StatusOutput()
+                {
+                    message = "User already exists"
+                };
+                return Ok(output);
             }
         }
 
@@ -129,7 +137,12 @@ namespace PMUnifiedAPI.Controllers
 
                     await _context.SaveChangesAsync();
 
-                    return Ok();
+                    StatusOutput output = new StatusOutput()
+                    {
+                        message = "Password changed"
+                    };
+
+                    return Ok(output);
                 }
                 else
                 {
@@ -145,6 +158,11 @@ namespace PMUnifiedAPI.Controllers
         private bool UsersExists(int id)
         {
             return _context.Users.Any(e => e.Id == id);
+        }
+
+        public class StatusOutput
+        {
+            public string message { get; set; }
         }
 
         public class LoginInput

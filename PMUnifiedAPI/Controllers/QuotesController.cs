@@ -54,10 +54,25 @@ namespace PMUnifiedAPI.Controllers
             if (topsList.Count > 0)
             {
                 var topsData = topsList[0];
-                output.symbol = topsData.symbol;
-                output.price = topsData.bidPrice;
-                output.timestamp = DateTime.Now;
-                output.source = "IEX TOPS";
+                if (topsData.bidPrice > 0)
+                {
+                    output.symbol = topsData.symbol;
+                    output.price = topsData.bidPrice;
+                    output.timestamp = DateTime.Now;
+                    output.source = "IEX TOPS";
+                }
+                else
+                {
+                    endpoint = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + symbol + "&apikey=" +
+                               avApiKey;
+                    var avResponse = await client.GetAsync(endpoint);
+                    string avJsonResponse = await avResponse.Content.ReadAsStringAsync();
+                    var avQuote = JsonConvert.DeserializeObject<AlphaVantageGlobalQuote>(avJsonResponse);
+                    output.symbol = avQuote?.GlobalQuote?.symbol;
+                    output.price = Convert.ToDouble(avQuote?.GlobalQuote?.price);
+                    output.timestamp = DateTime.Now;
+                    output.source = "Alpha Vantage Global Quote";
+                }
             }
             else
             {
