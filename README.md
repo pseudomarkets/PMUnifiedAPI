@@ -1,6 +1,9 @@
 # Pseudo Markets Unified Web API
 
-The all new, unified .NET Core Web API for Pseudo Markets. This Web API exposes functionality for user account management, gathering equity and ETF data, executing trades, and managing your virtual portfolio. 
+The all new, unified .NET Core Web API for Pseudo Markets. This Web API exposes functionality for user account management, gathering equity and ETF data, executing trades, and managing your virtual portfolio.
+
+# Hosted Instance
+The official, live hosted instance of the Unified API is hosted here: https://app.pseudomarkets.live (API documentation available in the Wiki) 
 
 # Building and Running
 You'll need the following to build, run, debug, and host the Pseudo Markets Web API

@@ -17,7 +17,7 @@ namespace PMUnifiedAPI.Controllers
     public class AccountController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string baseUrl = "https://localhost:44323";
+        private string baseUrl = "https://app.pseudomarkets.live";
 
         public AccountController(PseudoMarketsDbContext context)
         {
