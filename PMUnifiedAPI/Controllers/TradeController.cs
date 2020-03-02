@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -64,24 +65,68 @@ namespace PMUnifiedAPI.Controllers
 
             if (input.Type == "BUY")
             {
-                Positions position = new Positions()
+                var doesAccountHaveExistingPosition =
+                    _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
+                if (doesAccountHaveExistingPosition == true)
                 {
-                    AccountId = account.Id,
-                    OrderId = createdOrder.Id,
-                    Value = value,
-                    Symbol = input.Symbol
-                };
-                _context.Positions.Add(position);
-                await _context.SaveChangesAsync();
+                    var existingPosition = await _context.Positions
+                        .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
+                    existingPosition.Value += value;
+                    existingPosition.Quantity += input.Quantity;
+                    _context.Entry(existingPosition).State = EntityState.Modified;
+                    account.Balance = account.Balance - value;
+                    _context.Entry(account).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    Positions position = new Positions()
+                    {
+                        AccountId = account.Id,
+                        OrderId = createdOrder.Id,
+                        Value = value,
+                        Symbol = input.Symbol,
+                        Quantity = input.Quantity
+                    };
+                    _context.Positions.Add(position);
+                    await _context.SaveChangesAsync();
 
-                account.Balance = account.Balance - value;
-                _context.Entry(account).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-
+                    account.Balance = account.Balance - value;
+                    _context.Entry(account).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else if(input.Type == "SELL")
+            {
+                var doesAccountHaveExistingPosition =
+                    _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
+                if (doesAccountHaveExistingPosition == true)
+                {
+                    var existingPosition = await _context.Positions
+                        .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
+                    if (input.Quantity == existingPosition.Quantity)
+                    {
+                        _context.Entry(existingPosition).State = EntityState.Deleted;
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        existingPosition.Value -= value;
+                        existingPosition.Quantity -= input.Quantity;
+                        _context.Entry(existingPosition).State = EntityState.Modified;
+                        account.Balance = account.Balance + value;
+                        _context.Entry(account).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                else
+                {
+                    return Ok("No positions to sell for symbol: " + input.Symbol);
+                }
             }
             else
             {
-                // TO DO: Logic for SELLS
+                // TO DO: LOGIC FOR SHORT SELLING
             }
 
             return Ok(createdOrder);

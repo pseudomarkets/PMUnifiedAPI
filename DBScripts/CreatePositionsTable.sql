@@ -1,7 +1,7 @@
 USE [C:\USERS\SHRAVAN\DOCUMENTS\PSEUDO MARKETS\PMUNIFIEDAPI\PSEUDOMARKETSDB.MDF]
 GO
 
-/****** Object:  Table [dbo].[Positions]    Script Date: 3/1/2020 12:22:01 AM ******/
+/****** Object:  Table [dbo].[Positions]    Script Date: 3/1/2020 8:23:12 PM ******/
 SET ANSI_NULLS ON
 GO
 
@@ -14,6 +14,7 @@ CREATE TABLE [dbo].[Positions](
 	[OrderId] [int] NOT NULL,
 	[Value] [float] NOT NULL,
 	[Symbol] [varchar](20) NOT NULL,
+	[Quantity] [int] NOT NULL,
  CONSTRAINT [PK__Position__3214EC072FAF3D2D] PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC

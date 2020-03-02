@@ -20,5 +20,6 @@ namespace PMUnifiedAPI.Models
         public int OrderId { get; set; }
         public double Value { get; set; }
         public string Symbol { get; set; }
+        public int Quantity { get; set; }
     }
 }

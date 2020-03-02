@@ -35,38 +35,44 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Users>> RegisterUser(LoginInput input)
         {
-            byte[] salt = new byte[128 / 8];
-            using (var rng = RandomNumberGenerator.Create())
+            if (! _context.Users.Any(x => x.Username == input.username))
             {
-                rng.GetBytes(salt);
+                byte[] salt = new byte[128 / 8];
+                using (var rng = RandomNumberGenerator.Create())
+                {
+                    rng.GetBytes(salt);
+                }
+
+                Users newUser = new Users()
+                {
+                    Username = input.username,
+                    Password = PasswordHashHelper.GetHash(input.password, salt),
+                    Salt = salt
+                };
+
+                _context.Users.Add(newUser);
+                await _context.SaveChangesAsync();
+
+                Users createdUser = await _context.Users.FirstOrDefaultAsync(x => x.Username == input.username);
+                Tokens newToken = new Tokens()
+                {
+                    UserID = createdUser.Id,
+                    Token = TokenHelper.GenerateToken(input.username)
+                };
+                Accounts newAccount = new Accounts()
+                {
+                    UserID = createdUser.Id,
+                    Balance = 1000000.99
+                };
+                _context.Tokens.Add(newToken);
+                _context.Accounts.Add(newAccount);
+                await _context.SaveChangesAsync();
+                return Ok("User Created");
             }
-
-            Users newUser = new Users()
+            else
             {
-                Username = input.username,
-                Password = PasswordHashHelper.GetHash(input.password, salt),
-                Salt = salt
-            };
-
-            _context.Users.Add(newUser);
-            await _context.SaveChangesAsync();
-
-            Users createdUser = await _context.Users.FirstOrDefaultAsync(x => x.Username == input.username);
-            Tokens newToken = new Tokens()
-            {
-                UserID = createdUser.Id,
-                Token = TokenHelper.GenerateToken(input.username)
-            };
-            Accounts newAccount = new Accounts()
-            {
-                UserID = createdUser.Id,
-                Balance = 1000000.99
-            };
-            _context.Tokens.Add(newToken);
-            _context.Accounts.Add(newAccount);
-            await _context.SaveChangesAsync();
-
-            return Ok("User Created");
+                return Ok("User already exists");
+            }
         }
 
         // POST: api/Users/Login
