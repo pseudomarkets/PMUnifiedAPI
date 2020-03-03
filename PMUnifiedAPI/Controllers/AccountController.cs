@@ -60,7 +60,7 @@ namespace PMUnifiedAPI.Controllers
                 string jsonResponse = await response.Content.ReadAsStringAsync();
                 var jsonObj = JsonConvert.DeserializeObject<LatestPriceOutput>(jsonResponse);
                 double price = jsonObj.price;
-                totalCurrentValue = price * p.Quantity;
+                totalCurrentValue += price * p.Quantity;
                 numPositions++;
             }
             investmentGainOrLoss = totalCurrentValue - totalInvestedValue;
@@ -77,7 +77,6 @@ namespace PMUnifiedAPI.Controllers
 
             return Ok(output);
         }
-
     }
 
     public class ViewAccount

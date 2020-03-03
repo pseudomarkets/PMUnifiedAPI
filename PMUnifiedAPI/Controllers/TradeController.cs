@@ -110,7 +110,9 @@ namespace PMUnifiedAPI.Controllers
                                 .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
                             if (input.Quantity == existingPosition.Quantity)
                             {
+                                account.Balance = account.Balance + value;
                                 _context.Entry(existingPosition).State = EntityState.Deleted;
+                                _context.Entry(account).State = EntityState.Modified;
                                 await _context.SaveChangesAsync();
                             }
                             else
