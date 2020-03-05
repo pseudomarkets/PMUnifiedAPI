@@ -43,7 +43,7 @@ namespace PMUnifiedAPI.Controllers
             var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
 
             var client = new HttpClient();
-            var response = await client.GetAsync(baseUrl + "/api/Quotes/LatestPrice/" + input.Symbol);
+            var response = await client.GetAsync(baseUrl + "/api/Quotes/SmartQuote/" + input.Symbol);
             string jsonResponse = await response.Content.ReadAsStringAsync();
             var jsonObj = JsonConvert.DeserializeObject<LatestPriceOutput>(jsonResponse);
             double price = jsonObj.price;
