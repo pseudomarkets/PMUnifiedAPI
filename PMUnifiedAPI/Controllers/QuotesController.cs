@@ -179,7 +179,7 @@ namespace PMUnifiedAPI.Controllers
         public async Task<ActionResult> GetIndices()
         {
             var client = new HttpClient();
-            string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=SPX,IXIC,DOW&interval=1min&apikey=" + twelveDataApiKey;
+            string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=SPX,IXIC,DJI&interval=1min&apikey=" + twelveDataApiKey;
             var tdResponse = await client.GetAsync(tdEndpoint);
             string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
             var tdIndices = JsonConvert.DeserializeObject<TwelveDataIndices>(tdJsonResponse);
@@ -189,17 +189,17 @@ namespace PMUnifiedAPI.Controllers
                 new StockIndex()
                 {
                     name = "DOW",
-                    price = Convert.ToDouble(tdIndices?.Dow?.Values[0]?.Close)
+                    points = Convert.ToDouble(tdIndices?.Dow?.Values[0]?.Close)
                 },
                 new StockIndex()
                 {
                     name = "S&P 500",
-                    price = Convert.ToDouble(tdIndices?.Spx?.Values[0]?.Close)
+                    points = Convert.ToDouble(tdIndices?.Spx?.Values[0]?.Close)
                 },
                 new StockIndex()
                 {
                     name = "NASDAQ Composite",
-                    price = Convert.ToDouble(tdIndices?.Ixic?.Values[0]?.Close)
+                    points = Convert.ToDouble(tdIndices?.Ixic?.Values[0]?.Close)
                 }
             };
             output.indices = indexList;
@@ -221,7 +221,7 @@ namespace PMUnifiedAPI.Controllers
         public class StockIndex
         {
             public string name { get; set; }
-            public double price { get; set; }
+            public double points { get; set; }
         }
 
         public partial class TwelveDataIndices
@@ -232,7 +232,7 @@ namespace PMUnifiedAPI.Controllers
             [JsonProperty("IXIC")]
             public TwelveDataTimeSeries Ixic { get; set; }
             
-            [JsonProperty("DOW")]
+            [JsonProperty("DJI")]
             public TwelveDataTimeSeries Dow { get; set; }
         }
         
