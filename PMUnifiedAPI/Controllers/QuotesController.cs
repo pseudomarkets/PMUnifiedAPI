@@ -173,6 +173,35 @@ namespace PMUnifiedAPI.Controllers
             return Ok(output);
         }
 
+        // GET: /api/Quotes/DetailedQuote/AMZN/1day
+        [Route("DetailedQuote/{symbol}/{interval}")]
+        [HttpGet]
+        public async Task<ActionResult> GetDetailedQuote(string symbol, string interval)
+        {
+            var client = new HttpClient();
+            string endpoint = "https://api.twelvedata.com/quote?symbol=" + symbol + "&interval=" + interval + "&apikey=" + twelveDataApiKey;
+            var response = await client.GetAsync(endpoint);
+            string responseString = await response.Content.ReadAsStringAsync();
+            var jsonResponse = JsonConvert.DeserializeObject<TwelveDataQuote>(responseString);
+            DetailedQuoteOutput output = new DetailedQuoteOutput()
+            {
+                name = jsonResponse?.Name,
+                symbol = jsonResponse?.Symbol,
+                open = Convert.ToDouble(jsonResponse?.Open),
+                high = Convert.ToDouble(jsonResponse?.High),
+                low = Convert.ToDouble(jsonResponse?.Low),
+                close = Convert.ToDouble(jsonResponse?.Close),
+                volume = Convert.ToInt64(jsonResponse?.Volume),
+                previousClose = Convert.ToDouble(jsonResponse?.PreviousClose),
+                change = Convert.ToDouble(jsonResponse?.Change),
+                changePercentage = Convert.ToDouble(jsonResponse?.PercentChange),
+                timestamp = DateTime.Now
+            };
+
+            Response.ContentType = "application/json";
+            return Ok(output);
+        }
+
         
         [Route("Indices")]
         [HttpGet]
@@ -247,6 +276,42 @@ namespace PMUnifiedAPI.Controllers
 
             [JsonProperty("status")]
             public string Status { get; set; }
+        }
+
+        public partial class TwelveDataQuote
+        {
+            [JsonProperty("symbol")]
+            public string Symbol { get; set; }
+
+            [JsonProperty("name")]
+            public string Name { get; set; }
+
+            [JsonProperty("datetime")]
+            public DateTimeOffset Datetime { get; set; }
+
+            [JsonProperty("open")]
+            public string Open { get; set; }
+
+            [JsonProperty("high")]
+            public string High { get; set; }
+
+            [JsonProperty("low")]
+            public string Low { get; set; }
+
+            [JsonProperty("close")]
+            public string Close { get; set; }
+
+            [JsonProperty("volume")]
+            public string Volume { get; set; }
+
+            [JsonProperty("previous_close")]
+            public string PreviousClose { get; set; }
+
+            [JsonProperty("change")]
+            public string Change { get; set; }
+
+            [JsonProperty("percent_change")]
+            public string PercentChange { get; set; }
         }
 
         public partial class Meta
@@ -336,6 +401,21 @@ namespace PMUnifiedAPI.Controllers
             public double price { get; set; }
             public DateTime timestamp { get; set; }
             public string source { get; set; }
+        }
+
+        public class DetailedQuoteOutput
+        {
+            public string symbol { get; set; }
+            public string name { get; set; }
+            public DateTime timestamp { get; set; }
+            public double open { get; set; }
+            public double close { get; set; }
+            public double high { get; set; }
+            public double low { get; set; }
+            public long volume { get; set; }
+            public double previousClose { get; set; }
+            public double change { get; set; }
+            public double changePercentage { get; set; }
         }
 
         public class IexCloudTops
