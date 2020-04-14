@@ -1,7 +1,7 @@
 USE [C:\USERS\SHRAVAN\DOCUMENTS\PSEUDO MARKETS\PMUNIFIEDAPI\PSEUDOMARKETSDB.MDF]
 GO
 
-/****** Object:  Table [dbo].[Tokens]    Script Date: 2/29/2020 7:52:25 PM ******/
+/****** Object:  Table [dbo].[Tokens]    Script Date: 4/14/2020 3:52:52 PM ******/
 SET ANSI_NULLS ON
 GO
 
