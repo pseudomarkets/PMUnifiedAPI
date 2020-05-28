@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
+using TwelveDataSharp;
 
 /*
  * Pseudo Markets Unified Web API
@@ -67,26 +68,22 @@ namespace PMUnifiedAPI.Controllers
                 }
                 else
                 {
-                    string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=" + symbol + "&interval=1min&apikey=" + twelveDataApiKey;
-                    var tdResponse = await client.GetAsync(tdEndpoint);
-                    string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
-                    var tdTimeSeries = JsonConvert.DeserializeObject<TwelveDataTimeSeries>(tdJsonResponse);
-                    output.symbol = tdTimeSeries?.Meta?.Symbol;
-                    output.price = Convert.ToDouble(tdTimeSeries?.Values[0]?.Close);
+                    TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                    var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
+                    output.symbol = symbol;
+                    output.price = price.Price;
                     output.timestamp = DateTime.Now;
-                    output.source = "Twelve Data Time Series";
+                    output.source = "Twelve Data Real Time Price";
                 }
             }
             else
             {
-                string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=" + symbol + "&interval=1min&apikey=" + twelveDataApiKey;
-                var tdResponse = await client.GetAsync(tdEndpoint);
-                string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
-                var tdTimeSeries = JsonConvert.DeserializeObject<TwelveDataTimeSeries>(tdJsonResponse);
-                output.symbol = tdTimeSeries?.Meta?.Symbol;
-                output.price = Convert.ToDouble(tdTimeSeries?.Values[0]?.Close);
+                TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
+                output.symbol = symbol;
+                output.price = price.Price;
                 output.timestamp = DateTime.Now;
-                output.source = "Twelve Data Time Series";
+                output.source = "Twelve Data Real Time Price";
             }
 
             Response.ContentType = "application/json";
@@ -108,7 +105,7 @@ namespace PMUnifiedAPI.Controllers
             IexCloudTops topsData;
             double iexTopsPrice = 0;
             double avGloablQuote = 0;
-            double twelveDataTimeSeriesClose = 0;
+            double twelveDataRealTimePrice = 0;
             if (topsList.Count > 0)
             {
                 topsData = topsList[0];
@@ -125,11 +122,9 @@ namespace PMUnifiedAPI.Controllers
             var avQuote = JsonConvert.DeserializeObject<AlphaVantageGlobalQuote>(avJsonResponse);
             avGloablQuote = Convert.ToDouble(avQuote?.GlobalQuote?.price);
 
-            string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=" + symbol + "&interval=1min&apikey=" +twelveDataApiKey;
-            var tdResponse = await client.GetAsync(tdEndpoint);
-            string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
-            var tdTimeSeries = JsonConvert.DeserializeObject<TwelveDataTimeSeries>(tdJsonResponse);
-            twelveDataTimeSeriesClose = Convert.ToDouble(tdTimeSeries?.Values[0]?.Close);
+            TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+            var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
+            twelveDataRealTimePrice = price.Price;
 
             var prices = new List<double>();
             if (iexTopsPrice > 0)
@@ -142,9 +137,9 @@ namespace PMUnifiedAPI.Controllers
                 prices.Add(avGloablQuote);
             }
 
-            if (twelveDataTimeSeriesClose > 0)
+            if (twelveDataRealTimePrice > 0)
             {
-                prices.Add(twelveDataTimeSeriesClose);
+                prices.Add(twelveDataRealTimePrice);
             }
 
             double bestPrice = prices.Min();
@@ -159,9 +154,9 @@ namespace PMUnifiedAPI.Controllers
                 output.source = "Alpha Vantage Global Quote";
             }
 
-            if (bestPrice.Equals(twelveDataTimeSeriesClose))
+            if (bestPrice.Equals(twelveDataRealTimePrice))
             {
-                output.source = "Twelve Data Time Series";
+                output.source = "Twelve Data Real Time Price";
             }
 
             output.symbol = symbol.ToUpper();
@@ -178,23 +173,20 @@ namespace PMUnifiedAPI.Controllers
         [HttpGet]
         public async Task<ActionResult> GetDetailedQuote(string symbol, string interval)
         {
-            var client = new HttpClient();
-            string endpoint = "https://api.twelvedata.com/quote?symbol=" + symbol + "&interval=" + interval + "&apikey=" + twelveDataApiKey;
-            var response = await client.GetAsync(endpoint);
-            string responseString = await response.Content.ReadAsStringAsync();
-            var jsonResponse = JsonConvert.DeserializeObject<TwelveDataQuote>(responseString);
+            TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+            var detailedQuote = await twelveDataClient.GetQuoteAsync(symbol, interval);
             DetailedQuoteOutput output = new DetailedQuoteOutput()
             {
-                name = jsonResponse?.Name,
-                symbol = jsonResponse?.Symbol,
-                open = Convert.ToDouble(jsonResponse?.Open),
-                high = Convert.ToDouble(jsonResponse?.High),
-                low = Convert.ToDouble(jsonResponse?.Low),
-                close = Convert.ToDouble(jsonResponse?.Close),
-                volume = Convert.ToInt64(jsonResponse?.Volume),
-                previousClose = Convert.ToDouble(jsonResponse?.PreviousClose),
-                change = Convert.ToDouble(jsonResponse?.Change),
-                changePercentage = Convert.ToDouble(jsonResponse?.PercentChange),
+                name = detailedQuote.Name,
+                symbol = symbol,
+                open = detailedQuote.Open,
+                high = detailedQuote.High,
+                low = detailedQuote.Low,
+                close = detailedQuote.Close,
+                volume = detailedQuote.Volume,
+                previousClose = detailedQuote.PreviousClose,
+                change = detailedQuote.Change,
+                changePercentage = detailedQuote.PercentChange,
                 timestamp = DateTime.Now
             };
 
