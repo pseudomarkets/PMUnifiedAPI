@@ -26,5 +26,6 @@ namespace PMUnifiedAPI.Models
         public DbSet<Accounts> Accounts { get; set; }
         public DbSet<Positions> Positions { get; set; }
         public DbSet<Orders> Orders { get; set; }
+        public DbSet<Transactions> Transactions { get; set; }
     }
 }

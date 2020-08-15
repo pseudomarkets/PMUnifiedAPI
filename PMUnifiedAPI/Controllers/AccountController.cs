@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace PMUnifiedAPI.Controllers
 {
@@ -17,11 +19,14 @@ namespace PMUnifiedAPI.Controllers
     public class AccountController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string baseUrl = "https://app.pseudomarkets.live";
+        private string baseUrl = "";
+        private readonly IOptions<PseudoMarketsConfig> config;
 
-        public AccountController(PseudoMarketsDbContext context)
+        public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
+            config = appConfig;
+            baseUrl = config.Value.AppBaseUrl;
         }
 
         // POST: /api/Account/Positions
@@ -35,6 +40,21 @@ namespace PMUnifiedAPI.Controllers
 
             var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
             return Ok(positions);
+        }
+
+        // POST: /api/Account/Transactions
+        [HttpPost]
+        [Route("Transactions")]
+        public async Task<ActionResult> ViewTransactions(ViewAccount input)
+        {
+            var userId = await _context.Tokens.Where(x => x.Token == input.Token).Select(x => x.UserID).FirstOrDefaultAsync();
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
+            var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
+            var transactions = await _context.Transactions.Where(x => x.AccountId == account.Id).ToListAsync();
+            var orders = transactions.Join(_context.Orders, transactions1 => transactions1.TransactionId,
+                orders1 => orders1.TransactionID, (transactions1, orders1) => orders1).ToList();
+
+            return Ok(orders);
         }
 
         // POST: /api/Account/Summary

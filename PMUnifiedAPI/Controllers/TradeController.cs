@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
 
@@ -25,11 +26,14 @@ namespace PMUnifiedAPI.Controllers
     public class TradeController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string baseUrl = "https://app.pseudomarkets.live";
+        private string baseUrl = "";
+        private readonly IOptions<PseudoMarketsConfig> config;
 
-        public TradeController(PseudoMarketsDbContext context)
+        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
+            config = appConfig;
+            baseUrl = config.Value.AppBaseUrl;
         }
 
         // POST: /api/Trade/Execute
@@ -62,7 +66,15 @@ namespace PMUnifiedAPI.Controllers
                         Date = DateTime.Now,
                         TransactionID = transactionId
                     };
+
+                    Transactions transaction = new Transactions()
+                    {
+                        AccountId = account.Id,
+                        TransactionId = transactionId
+                    };
+
                     _context.Orders.Add(order);
+                    _context.Transactions.Add(transaction);
                     await _context.SaveChangesAsync();
 
                     var createdOrder = await _context.Orders.FirstOrDefaultAsync(x => x.TransactionID == transactionId);

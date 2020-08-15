@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
 using TwelveDataSharp;
@@ -27,10 +28,12 @@ namespace PMUnifiedAPI.Controllers
         private string iexApiKey = "";
         private string avApiKey = "";
         private string twelveDataApiKey = "";
+        private readonly IOptions<PseudoMarketsConfig> config;
 
-        public QuotesController(PseudoMarketsDbContext context)
+        public QuotesController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
+            config = appConfig;
             iexApiKey = _context.ApiKeys.Where(x => x.ProviderName == "IEX").Select(x => x.ApiKey).FirstOrDefault();
             avApiKey = _context.ApiKeys.Where(x => x.ProviderName == "AV").Select(x => x.ApiKey).FirstOrDefault();
             twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
@@ -41,7 +44,7 @@ namespace PMUnifiedAPI.Controllers
         [HttpGet]
         public ActionResult LandingPage()
         {
-            return Ok("Pseudo Markets Quotes API" + "\n" + "(c) 2019 - 2020 Pseudo Markets");
+            return Ok("Pseudo Markets Quotes API" + "\n" + "Version: " + config.Value.AppVersion + "\n" + "Server: " + config.Value.ServerId + "\n" + "Environment: " + config.Value.Environment +"\n" + "(c) 2019 - 2020 Pseudo Markets");
         }
 
         // GET: api/Quotes/LatestPrice/MSFT

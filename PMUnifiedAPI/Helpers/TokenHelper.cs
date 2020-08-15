@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using JWT.Algorithms;
 using JWT.Builder;
 using JWT.Serializers;
+using Microsoft.Extensions.Configuration;
 
 /*
  * Pseudo Markets Unified Web API
@@ -19,7 +20,7 @@ namespace PMUnifiedAPI.Helpers
     public class TokenHelper
     {
         // REPLACE THIS WITH YOUR OWN SECRET STRING!
-        private static string secret = "YOUR_SECRET_HERE";
+        private static string secret = Startup.Configuration.GetValue<string>("PMConfig:TokenSecretKey");
 
         public static bool ValidateToken(string token)
         {

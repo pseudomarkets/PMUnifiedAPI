@@ -1,4 +1,4 @@
-USE [C:\USERS\SHRAVAN\DOCUMENTS\PSEUDO MARKETS\PMUNIFIEDAPI\PSEUDOMARKETSDB.MDF]
+USE PseudoMarketsDB
 GO
 
 /****** Object:  Table [dbo].[ApiKeys]    Script Date: 4/14/2020 3:51:58 PM ******/
