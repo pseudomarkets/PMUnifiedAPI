@@ -71,6 +71,7 @@ namespace PMUnifiedAPI.Controllers
             int numPositions = 0;
             double totalCurrentValue = 0;
             double investmentGainOrLoss = 0;
+            double investmentGainOrLossPercentage = 0;
             foreach (Positions p in positions)
             {
                 totalInvestedValue += p.Value;
@@ -84,6 +85,14 @@ namespace PMUnifiedAPI.Controllers
                 numPositions++;
             }
             investmentGainOrLoss = totalCurrentValue - totalInvestedValue;
+            if (investmentGainOrLoss > 0)
+            {
+                investmentGainOrLossPercentage = (investmentGainOrLoss / totalInvestedValue) * 100;
+            }
+            else
+            {
+                investmentGainOrLossPercentage = (-1 * (investmentGainOrLoss / totalInvestedValue)) * 100;
+            }
 
             AccountSummaryOutput output = new AccountSummaryOutput()
             {
@@ -92,7 +101,8 @@ namespace PMUnifiedAPI.Controllers
                 TotalCurrentValue = totalCurrentValue,
                 TotalInvestedValue = totalInvestedValue,
                 NumberOfPositions = numPositions,
-                InvestmentGainOrLoss = investmentGainOrLoss
+                InvestmentGainOrLoss = investmentGainOrLoss,
+                InvestmentGainOrLossPercentage = investmentGainOrLossPercentage
             };
 
             return Ok(output);
@@ -111,6 +121,7 @@ namespace PMUnifiedAPI.Controllers
         public double TotalInvestedValue { get; set; }
         public double TotalCurrentValue { get; set; }
         public double InvestmentGainOrLoss { get; set; }
+        public double InvestmentGainOrLossPercentage { get; set; }
         public int NumberOfPositions { get; set; }
 
     }
