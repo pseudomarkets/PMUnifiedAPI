@@ -3,13 +3,9 @@
 The unified .NET Core Web API for Pseudo Markets. This Web API exposes functionality for user account management, gathering equity and ETF data, executing trades, and managing your virtual portfolio.
 
 # Official Hosted Instances
-List of current official Pseudo Markets instances (updated with every commit). Please note that databases are NOT shared between each instance. 
+List of current official Pseudo Markets instances (updated with every commit).
 
-Windows Host in Dallas, TX: https://app.pseudomarkets.live
-
-CentOS 8 Host in Dallas, TX: https://app2.pseudomarkets.live
-
-Contact us if you'd like to be added to the official hosts list
+https://docs.google.com/spreadsheets/d/1E3U0WuU64ZSKW41NIDrM9nCq-1atvdQ4gBdHlo2CQWo/edit?usp=sharing
 
 # Demo
 You can lookup stock and ETF price qoutes without creating an account, for example: https://app2.pseudomarkets.live/api/Quotes/LatestPrice/AAPL
