@@ -12,5 +12,7 @@ namespace PMUnifiedAPI.Models
         public string AppVersion { get; set; }
         public string Environment { get; set; }
         public string ServerId { get; set; }
+        public bool DataSyncEnabled { get; set; }
+        public string DataSyncTargetDb { get; set; }
     }
 }

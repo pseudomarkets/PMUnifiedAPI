@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JWT.Algorithms;
 using JWT.Builder;
+using JWT.Exceptions;
 using JWT.Serializers;
 using Microsoft.Extensions.Configuration;
 
