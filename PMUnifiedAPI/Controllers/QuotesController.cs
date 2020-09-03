@@ -44,7 +44,7 @@ namespace PMUnifiedAPI.Controllers
         [HttpGet]
         public ActionResult LandingPage()
         {
-            return Ok("Pseudo Markets Quotes API" + "\n" + "Version: " + config.Value.AppVersion + "\n" + "Server: " + config.Value.ServerId + "\n" + "Environment: " + config.Value.Environment +"\n" + "(c) 2019 - 2020 Pseudo Markets");
+            return Ok("Pseudo Markets Quotes API" + "\n" + "(c) 2019 - 2020 Pseudo Markets");
         }
 
         // GET: api/Quotes/LatestPrice/MSFT
