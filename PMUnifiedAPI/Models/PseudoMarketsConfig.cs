@@ -14,5 +14,8 @@ namespace PMUnifiedAPI.Models
         public string ServerId { get; set; }
         public bool DataSyncEnabled { get; set; }
         public string DataSyncTargetDb { get; set; }
+        public string NetMQServer { get; set; }
+        public string AerospikeServerIP { get; set; }
+        public int AerospikeServerPort { get; set; } 
     }
 }
