@@ -24,6 +24,7 @@ namespace PMUnifiedAPI.Controllers
         private string NetMqServerConnectionString = string.Empty;
         private string AerospikeServerIp = string.Empty;
         private int AerospikeServerPort = 0;
+        private bool XchangeEnabled = false;
 
         public XchangeController(IOptions<PseudoMarketsConfig> appConfig)
         {
@@ -31,49 +32,58 @@ namespace PMUnifiedAPI.Controllers
             NetMqServerConnectionString = config.Value.NetMQServer;
             AerospikeServerIp = config.Value.AerospikeServerIP;
             AerospikeServerPort = config.Value.AerospikeServerPort;
+            XchangeEnabled = config.Value.XchangeEnabled;
         }
 
         // GET: api/Xchange/
         [HttpGet]
         public string Get(int id)
         {
-            return "PseudoXchange";
+            return "PseudoXchange" + "\n" + "Enabled: " + XchangeEnabled;
         }
 
         [Route("LatestPrice/{symbol}")]
         [HttpGet]
         public async Task<ActionResult> GetLatestPrice(string symbol)
         {
-            AerospikeClient client = new AerospikeClient(AerospikeServerIp, AerospikeServerPort);
-            if (client.Connected)
+            if (XchangeEnabled)
             {
-                Key key = new Key("nsshared", "setXchangeEquities", symbol);
-                double price = -1;
-                Record record = client.Get(null, key);
-                if (record != null)
+                AerospikeClient client = new AerospikeClient(AerospikeServerIp, AerospikeServerPort);
+                if (client.Connected)
                 {
-                    var priceBin = record.bins.FirstOrDefault();
-                    price = (double) priceBin.Value;
+                    Key key = new Key("nsshared", "setXchangeEquities", symbol);
+                    double price = -1;
+                    Record record = client.Get(null, key);
+                    if (record != null)
+                    {
+                        var priceBin = record.bins.FirstOrDefault();
+                        price = (double)priceBin.Value;
+                    }
+                    else
+                    {
+                        symbol = "Invalid symbol";
+                    }
+
+                    XchangeQuote quote = new XchangeQuote()
+                    {
+                        Symbol = symbol,
+                        Price = price,
+                        Timestamp = DateTime.Now
+                    };
+
+                    return Ok(quote);
+
                 }
                 else
                 {
-                    symbol = "Invalid symbol";
+                    return StatusCode(500);
                 }
-
-                XchangeQuote quote = new XchangeQuote()
-                {
-                    Symbol = symbol,
-                    Price = price,
-                    Timestamp = DateTime.Now
-                };
-
-                return Ok(quote);
-
             }
             else
             {
-                return StatusCode(500);
+                return StatusCode(403);
             }
+
         }
 
         // POST: api/Xchange/OrderEntry
@@ -81,34 +91,42 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult> Post([FromBody] OrderEntry orderEntry)
         {
-
-            string token = orderEntry.Token;
-
-            using var client = new RequestSocket(NetMqServerConnectionString);  // connect
-            
-            XchangeOrder order = new XchangeOrder()
+            if (XchangeEnabled)
             {
-                Symbol = orderEntry.Symbol,
-                OrderType = orderEntry.OrderType,
-                Quantity = orderEntry.Quantity,
-                LowerLimitPrice = orderEntry.LowerLimitPrice,
-                UpperLimitPrice = orderEntry.UpperLimitPrice,
-                OrderFillSettings = orderEntry.OrderFillSettings,
-                OrderPricing = orderEntry.OrderPricing,
-                OrderRules = orderEntry.OrderRules,
-                OrderStatus = orderEntry.OrderStatus,
-            };
+                string token = orderEntry.Token;
 
-            var serializedOrder = MessagePackSerializer.Serialize(order);
+                using var client = new RequestSocket(NetMqServerConnectionString);  // connect
 
-            client.SendFrame(serializedOrder);
+                XchangeOrder order = new XchangeOrder()
+                {
+                    Symbol = orderEntry.Symbol,
+                    OrderType = orderEntry.OrderType,
+                    Quantity = orderEntry.Quantity,
+                    LowerLimitPrice = orderEntry.LowerLimitPrice,
+                    UpperLimitPrice = orderEntry.UpperLimitPrice,
+                    OrderFillSettings = orderEntry.OrderFillSettings,
+                    OrderPricing = orderEntry.OrderPricing,
+                    OrderRules = orderEntry.OrderRules,
+                    OrderStatus = orderEntry.OrderStatus,
+                    AccountId = orderEntry.AccountId
+                };
+
+                var serializedOrder = MessagePackSerializer.Serialize(order);
+
+                client.SendFrame(serializedOrder);
 
 
-            var message = client.ReceiveFrameBytes();
+                var message = client.ReceiveFrameBytes();
 
-            var deserializedOrderEntryResult = MessagePackSerializer.Deserialize<OrderEntryResult>(message);
+                var deserializedOrderEntryResult = MessagePackSerializer.Deserialize<OrderEntryResult>(message);
 
-            return Ok(deserializedOrderEntryResult);
+                return Ok(deserializedOrderEntryResult);
+            }
+            else
+            {
+                return StatusCode(403);
+            }
+
         }
 
     }

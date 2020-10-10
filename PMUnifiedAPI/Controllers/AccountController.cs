@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using TwelveDataSharp;
 
 namespace PMUnifiedAPI.Controllers
 {
@@ -21,12 +22,15 @@ namespace PMUnifiedAPI.Controllers
         private readonly PseudoMarketsDbContext _context;
         private string baseUrl = "";
         private readonly IOptions<PseudoMarketsConfig> config;
+        private string twelveDataApiKey = string.Empty;
 
         public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
             config = appConfig;
             baseUrl = config.Value.AppBaseUrl;
+            twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
+                .FirstOrDefault();
         }
 
         // POST: /api/Account/Positions
@@ -34,9 +38,9 @@ namespace PMUnifiedAPI.Controllers
         [Route("Positions")]
         public async Task<ActionResult> ViewPositions(ViewAccount input)
         {
-            var userId = await _context.Tokens.Where(x => x.Token == input.Token).Select(x => x.UserID).FirstOrDefaultAsync();
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-            var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
+
+            var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
+                tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts).FirstOrDefaultAsync();
 
             var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
             return Ok(positions);
@@ -47,14 +51,34 @@ namespace PMUnifiedAPI.Controllers
         [Route("Transactions")]
         public async Task<ActionResult> ViewTransactions(ViewAccount input)
         {
-            var userId = await _context.Tokens.Where(x => x.Token == input.Token).Select(x => x.UserID).FirstOrDefaultAsync();
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-            var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
+
+            var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
+                tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts).FirstOrDefaultAsync();
+
             var transactions = await _context.Transactions.Where(x => x.AccountId == account.Id).ToListAsync();
+
             var orders = transactions.Join(_context.Orders, transactions1 => transactions1.TransactionId,
                 orders1 => orders1.TransactionID, (transactions1, orders1) => orders1).ToList();
 
             return Ok(orders);
+        }
+
+        // POST: /api/Balance
+        [HttpPost]
+        [Route("Balance")]
+        public async Task<ActionResult> ViewBalance(ViewAccount input)
+        {
+            var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
+                    tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
+                .FirstOrDefaultAsync();
+
+            AccountBalanceOutput output = new AccountBalanceOutput()
+            {
+                AccountId = account.Id,
+                AccountBalance = account.Balance
+            };
+
+            return Ok(output);
         }
 
         // POST: /api/Account/Summary
@@ -62,9 +86,9 @@ namespace PMUnifiedAPI.Controllers
         [Route("Summary")]
         public async Task<ActionResult> ViewSummary(ViewAccount input)
         {
-            var userId = await _context.Tokens.Where(x => x.Token == input.Token).Select(x => x.UserID).FirstOrDefaultAsync();
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-            var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
+            var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
+                    tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
+                .FirstOrDefaultAsync();
 
             var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
             double totalInvestedValue = 0;
@@ -76,12 +100,9 @@ namespace PMUnifiedAPI.Controllers
             {
                 totalInvestedValue += p.Value;
                 string symbol = p.Symbol;
-                var client = new HttpClient();
-                var response = await client.GetAsync(baseUrl + "/api/Quotes/LatestPrice/" + symbol);
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-                var jsonObj = JsonConvert.DeserializeObject<LatestPriceOutput>(jsonResponse);
-                double price = jsonObj.price;
-                totalCurrentValue += price * p.Quantity;
+                TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                var latestPrice = await twelveDataClient.GetRealTimePriceAsync(symbol);
+                totalCurrentValue += latestPrice.Price * p.Quantity;
                 numPositions++;
             }
             investmentGainOrLoss = totalCurrentValue - totalInvestedValue;
@@ -112,6 +133,12 @@ namespace PMUnifiedAPI.Controllers
     public class ViewAccount
     {
         public string Token { get; set; }
+    }
+
+    public class AccountBalanceOutput
+    {
+        public int AccountId { get; set; }
+        public double AccountBalance { get; set; }
     }
 
     public class AccountSummaryOutput

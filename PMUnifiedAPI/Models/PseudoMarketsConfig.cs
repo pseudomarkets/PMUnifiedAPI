@@ -17,5 +17,6 @@ namespace PMUnifiedAPI.Models
         public string NetMQServer { get; set; }
         public string AerospikeServerIP { get; set; }
         public int AerospikeServerPort { get; set; } 
+        public bool XchangeEnabled { get; set; }
     }
 }
