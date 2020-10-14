@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using PMCommonApiModels.RequestModels;
+using PMCommonApiModels.ResponseModels;
 using TwelveDataSharp;
 
 namespace PMUnifiedAPI.Controllers
@@ -128,28 +130,5 @@ namespace PMUnifiedAPI.Controllers
 
             return Ok(output);
         }
-    }
-
-    public class ViewAccount
-    {
-        public string Token { get; set; }
-    }
-
-    public class AccountBalanceOutput
-    {
-        public int AccountId { get; set; }
-        public double AccountBalance { get; set; }
-    }
-
-    public class AccountSummaryOutput
-    {
-        public int AccountId { get; set; }
-        public double AccountBalance { get; set; }
-        public double TotalInvestedValue { get; set; }
-        public double TotalCurrentValue { get; set; }
-        public double InvestmentGainOrLoss { get; set; }
-        public double InvestmentGainOrLossPercentage { get; set; }
-        public int NumberOfPositions { get; set; }
-
     }
 }

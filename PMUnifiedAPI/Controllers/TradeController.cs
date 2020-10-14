@@ -12,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Update;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using PMCommonApiModels.RequestModels;
+using PMCommonApiModels.ResponseModels;
 using PMUnifiedAPI.Models;
 using PMDataSynchronizer;
 using PseudoMarketsDbContext = PMUnifiedAPI.Models.PseudoMarketsDbContext;
@@ -357,27 +359,5 @@ namespace PMUnifiedAPI.Controllers
 
         }
 
-    }
-
-    public class TradeExecInput
-    {
-        public string Token { get; set; }
-        public string Symbol { get; set; }
-        public int Quantity { get; set; }
-        public string Type { get; set; }
-    }
-
-    public class TradeExecOutput
-    {
-        public string Status { get; set; }
-        public Orders Order { get; set; }
-    }
-
-    public class LatestPriceOutput
-    {
-        public string symbol { get; set; }
-        public double price { get; set; }
-        public DateTime timestamp { get; set; }
-        public string source { get; set; }
     }
 }

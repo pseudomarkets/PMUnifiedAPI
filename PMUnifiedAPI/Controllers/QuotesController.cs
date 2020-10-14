@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using PMCommonApiModels.ResponseModels;
 using PMUnifiedAPI.Models;
 using TwelveDataSharp;
 
@@ -98,7 +99,7 @@ namespace PMUnifiedAPI.Controllers
         [HttpGet]
         public async Task<ActionResult> GetSmartPrice(string symbol)
         {
-            Controllers.LatestPriceOutput output = new Controllers.LatestPriceOutput();
+            LatestPriceOutput output = new LatestPriceOutput();
             var client = new HttpClient();
             string iexEndpoint =
                 "https://cloud.iexapis.com/stable/tops?token=" + iexApiKey + "&symbols=" + symbol;
@@ -122,7 +123,7 @@ namespace PMUnifiedAPI.Controllers
                        avApiKey;
             var avResponse = await client.GetAsync(avEndpoint);
             string avJsonResponse = await avResponse.Content.ReadAsStringAsync();
-            var avQuote = JsonConvert.DeserializeObject<AlphaVantageGlobalQuote>(avJsonResponse);
+            var avQuote = JsonConvert.DeserializeObject<AlphaVantage.AlphaVantageGlobalQuote>(avJsonResponse);
             avGloablQuote = Convert.ToDouble(avQuote?.GlobalQuote?.price);
 
             TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
@@ -206,7 +207,7 @@ namespace PMUnifiedAPI.Controllers
             string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=SPX,IXIC,DJI&interval=1min&apikey=" + twelveDataApiKey;
             var tdResponse = await client.GetAsync(tdEndpoint);
             string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
-            var tdIndices = JsonConvert.DeserializeObject<TwelveDataIndices>(tdJsonResponse);
+            var tdIndices = JsonConvert.DeserializeObject<TwelveData.TwelveDataIndices>(tdJsonResponse);
             IndicesOutput output = new IndicesOutput();
             List<StockIndex> indexList = new List<StockIndex>()
             {
@@ -234,203 +235,5 @@ namespace PMUnifiedAPI.Controllers
 
             return Ok(outputJson);
         }
-
-        public class IndicesOutput
-        {
-            public List<StockIndex> indices;
-            public string source { get; set; }
-            public DateTime timestamp { get; set; }
-        }
-
-        public class StockIndex
-        {
-            public string name { get; set; }
-            public double points { get; set; }
-        }
-
-        public partial class TwelveDataIndices
-        {
-            [JsonProperty("SPX")]
-            public TwelveDataTimeSeries Spx { get; set; }
-
-            [JsonProperty("IXIC")]
-            public TwelveDataTimeSeries Ixic { get; set; }
-            
-            [JsonProperty("DJI")]
-            public TwelveDataTimeSeries Dow { get; set; }
-        }
-        
-
-        public partial class TwelveDataTimeSeries
-        {
-            [JsonProperty("meta")]
-            public Meta Meta { get; set; }
-
-            [JsonProperty("values")]
-            public Value[] Values { get; set; }
-
-            [JsonProperty("status")]
-            public string Status { get; set; }
-        }
-
-        public partial class TwelveDataQuote
-        {
-            [JsonProperty("symbol")]
-            public string Symbol { get; set; }
-
-            [JsonProperty("name")]
-            public string Name { get; set; }
-
-            [JsonProperty("datetime")]
-            public DateTimeOffset Datetime { get; set; }
-
-            [JsonProperty("open")]
-            public string Open { get; set; }
-
-            [JsonProperty("high")]
-            public string High { get; set; }
-
-            [JsonProperty("low")]
-            public string Low { get; set; }
-
-            [JsonProperty("close")]
-            public string Close { get; set; }
-
-            [JsonProperty("volume")]
-            public string Volume { get; set; }
-
-            [JsonProperty("previous_close")]
-            public string PreviousClose { get; set; }
-
-            [JsonProperty("change")]
-            public string Change { get; set; }
-
-            [JsonProperty("percent_change")]
-            public string PercentChange { get; set; }
-        }
-
-        public partial class Meta
-        {
-            [JsonProperty("symbol")]
-            public string Symbol { get; set; }
-
-            [JsonProperty("interval")]
-            public string Interval { get; set; }
-
-            [JsonProperty("currency")]
-            public string Currency { get; set; }
-
-            [JsonProperty("exchange_timezone")]
-            public string ExchangeTimezone { get; set; }
-
-            [JsonProperty("exchange")]
-            public string Exchange { get; set; }
-
-            [JsonProperty("type")]
-            public string Type { get; set; }
-        }
-
-        public partial class Value
-        {
-            [JsonProperty("datetime")]
-            public DateTimeOffset Datetime { get; set; }
-
-            [JsonProperty("open")]
-            public string Open { get; set; }
-
-            [JsonProperty("high")]
-            public string High { get; set; }
-
-            [JsonProperty("low")]
-            public string Low { get; set; }
-
-            [JsonProperty("close")]
-            public string Close { get; set; }
-
-            [JsonProperty("volume")]
-            public long Volume { get; set; }
-        }
-
-        public partial class AlphaVantageGlobalQuote
-        {
-            [JsonProperty("Global Quote")]
-            public GlobalQuote GlobalQuote { get; set; }
-        }
-
-        public class GlobalQuote
-        {
-            [JsonProperty("01. symbol")]
-            public string symbol { get; set; }
-
-            [JsonProperty("02. open")]
-            public string open { get; set; }
-
-            [JsonProperty("03. high")]
-            public string high { get; set; }
-
-            [JsonProperty("04. low")]
-            public string low { get; set; }
-
-            [JsonProperty("05. price")]
-            public string price { get; set; }
-
-            [JsonProperty("06. volume")]
-            public string volume { get; set; }
-
-            [JsonProperty("07. latest trading day")]
-            public DateTimeOffset latestTradingDay { get; set; }
-
-            [JsonProperty("08. previous close")]
-            public string prevClose { get; set; }
-
-            [JsonProperty("09. change")]
-            public string change { get; set; }
-
-            [JsonProperty("10. change percent")]
-            public string changePercent { get; set; }
-        }
-
-        public class LatestPriceOutput
-        {
-            public string symbol { get; set; }
-            public double price { get; set; }
-            public DateTime timestamp { get; set; }
-            public string source { get; set; }
-        }
-
-        public class DetailedQuoteOutput
-        {
-            public string symbol { get; set; }
-            public string name { get; set; }
-            public DateTime timestamp { get; set; }
-            public double open { get; set; }
-            public double close { get; set; }
-            public double high { get; set; }
-            public double low { get; set; }
-            public long volume { get; set; }
-            public double previousClose { get; set; }
-            public double change { get; set; }
-            public double changePercentage { get; set; }
-        }
-
-        public class IexCloudTops
-        {
-            public string symbol { get; set; }
-            public double marketPercent { get; set; }
-            public int bidSize { get; set; }
-            public double bidPrice { get; set; }
-            public int askSize { get; set; }
-            public double askPrice { get; set; }
-            public int volume { get; set; }
-            public double lastSalePrice { get; set; }
-            public int lastSaleSize { get; set; }
-            public object lastSaleTime { get; set; }
-            public long lastUpdated { get; set; }
-            public string sector { get; set; }
-            public string securityType { get; set; }
-        }
-
-
-
     }
 }

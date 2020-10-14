@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using PMCommonApiModels.RequestModels;
+using PMCommonApiModels.ResponseModels;
 using PMDataSynchronizer;
 using PMUnifiedAPI.Helpers;
 using PMUnifiedAPI.Models;
@@ -190,24 +192,6 @@ namespace PMUnifiedAPI.Controllers
         private bool UsersExists(int id)
         {
             return _context.Users.Any(e => e.Id == id);
-        }
-
-        public class StatusOutput
-        {
-            public string message { get; set; }
-        }
-
-        public class LoginInput
-        {
-            public string username { get; set; }
-            public string password { get; set; }
-        }
-
-        public class ChangePasswordInput
-        {
-            public string username { get; set; }
-            public string old_password { get; set; }
-            public string new_password { get; set; }
         }
     }
 }

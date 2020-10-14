@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using PMCommonApiModels.ResponseModels;
 using PMUnifiedAPI.Models;
 
 namespace PMUnifiedAPI.Controllers
@@ -48,13 +49,4 @@ namespace PMUnifiedAPI.Controllers
         }
     }
 
-    public class AboutJsonResponse
-    {
-        public string AppName { get; set; }
-        public string AppVersion { get; set; }
-        public string ServerId { get; set; }
-        public string Environment { get; set; }
-        public bool DataSyncEnabled { get; set; }
-        public string Copyright { get; set; }
-    }
 }
