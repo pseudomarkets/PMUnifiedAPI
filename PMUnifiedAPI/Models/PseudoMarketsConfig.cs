@@ -18,5 +18,6 @@ namespace PMUnifiedAPI.Models
         public string AerospikeServerIP { get; set; }
         public int AerospikeServerPort { get; set; } 
         public bool XchangeEnabled { get; set; }
+        public string TokenIssuer { get; set; }
     }
 }

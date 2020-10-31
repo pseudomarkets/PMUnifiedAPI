@@ -13,6 +13,7 @@ using PMCommonApiModels.ResponseModels;
 using PMDataSynchronizer;
 using PMUnifiedAPI.Helpers;
 using PMUnifiedAPI.Models;
+using Serilog;
 using PseudoMarketsDbContext = PMUnifiedAPI.Models.PseudoMarketsDbContext;
 
 /*
@@ -46,67 +47,75 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Users>> RegisterUser(LoginInput input)
         {
-            if (! _context.Users.Any(x => x.Username == input.username))
+            try
             {
-                DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
-
-                byte[] salt = new byte[128 / 8];
-                using (var rng = RandomNumberGenerator.Create())
+                if (!_context.Users.Any(x => x.Username == input.username))
                 {
-                    rng.GetBytes(salt);
-                }
+                    DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
 
-                Users newUser = new Users()
-                {
-                    Username = input.username,
-                    Password = PasswordHashHelper.GetHash(input.password, salt),
-                    Salt = salt
-                };
-
-                _context.Users.Add(newUser);
-                await _context.SaveChangesAsync();
-
-                Users createdUser = await _context.Users.FirstOrDefaultAsync(x => x.Username == input.username);
-                Tokens newToken = new Tokens()
-                {
-                    UserID = createdUser.Id,
-                    Token = TokenHelper.GenerateToken(input.username)
-                };
-                Accounts newAccount = new Accounts()
-                {
-                    UserID = createdUser.Id,
-                    Balance = 1000000.99
-                };
-                _context.Tokens.Add(newToken);
-                _context.Accounts.Add(newAccount);
-                await _context.SaveChangesAsync();
-
-                if (DataSyncEnabled)
-                {
-                    Users replicatedUser = new Users()
+                    byte[] salt = new byte[128 / 8];
+                    using (var rng = RandomNumberGenerator.Create())
                     {
-                        Username = newUser.Username,
-                        Password = newUser.Password,
-                        Salt = newUser.Salt
+                        rng.GetBytes(salt);
+                    }
+
+                    Users newUser = new Users()
+                    {
+                        Username = input.username,
+                        Password = PasswordHashHelper.GetHash(input.password, salt),
+                        Salt = salt
                     };
 
-                    await dataSyncManager.SyncNewUser(replicatedUser, newToken.Token);
+                    _context.Users.Add(newUser);
+                    await _context.SaveChangesAsync();
 
+                    Users createdUser = await _context.Users.FirstOrDefaultAsync(x => x.Username == input.username);
+                    Tokens newToken = new Tokens()
+                    {
+                        UserID = createdUser.Id,
+                        Token = TokenHelper.GenerateToken(input.username)
+                    };
+                    Accounts newAccount = new Accounts()
+                    {
+                        UserID = createdUser.Id,
+                        Balance = 1000000.99
+                    };
+                    _context.Tokens.Add(newToken);
+                    _context.Accounts.Add(newAccount);
+                    await _context.SaveChangesAsync();
+
+                    if (DataSyncEnabled)
+                    {
+                        Users replicatedUser = new Users()
+                        {
+                            Username = newUser.Username,
+                            Password = newUser.Password,
+                            Salt = newUser.Salt
+                        };
+
+                        await dataSyncManager.SyncNewUser(replicatedUser, newToken.Token);
+
+                    }
+
+                    StatusOutput output = new StatusOutput()
+                    {
+                        message = StatusMessages.UserCreatedMessage
+                    };
+                    return Ok(output);
                 }
-
-                StatusOutput output = new StatusOutput()
+                else
                 {
-                    message = "User created"
-                };
-                return Ok(output);
+                    StatusOutput output = new StatusOutput()
+                    {
+                        message = StatusMessages.UserExistsMessage
+                    };
+                    return Ok(output);
+                }
             }
-            else
+            catch (Exception e)
             {
-                StatusOutput output = new StatusOutput()
-                {
-                    message = "User already exists"
-                };
-                return Ok(output);
+                Log.Fatal(e, $"{nameof(RegisterUser)}");
+                return StatusCode(500);
             }
         }
 
@@ -115,24 +124,38 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Tokens>> LoginUser(LoginInput loginInput)
         {
-            var exists = _context.Users.Any(x => x.Username == loginInput.username);
-            if (exists)
+            try
             {
-                var user = await _context.Users.Where(x => x.Username == loginInput.username).FirstOrDefaultAsync();
-
-                if (PasswordHashHelper.GetHash(loginInput.password, user.Salt) == user.Password)
+                var exists = _context.Users.Any(x => x.Username == loginInput.username);
+                if (exists)
                 {
-                    var token = _context.Tokens.FirstOrDefault(x => x.UserID == user.Id);
-                    return Ok(token);
+                    var user = await _context.Users.Where(x => x.Username == loginInput.username).FirstOrDefaultAsync();
+
+                    if (PasswordHashHelper.GetHash(loginInput.password, user.Salt) == user.Password)
+                    {
+                        var token = _context.Tokens.FirstOrDefault(x => x.UserID == user.Id);
+
+                        // Create a new token on every successful login
+                        token.Token = TokenHelper.GenerateToken(user.Username);
+                        _context.Entry(token).State = EntityState.Modified;
+
+                        await _context.SaveChangesAsync();
+                        return Ok(token);
+                    }
+                    else
+                    {
+                        return Unauthorized();
+                    }
                 }
                 else
                 {
                     return Unauthorized();
                 }
             }
-            else
+            catch (Exception e)
             {
-                return Unauthorized();
+                Log.Fatal(e, $"{nameof(LoginUser)}");
+                return StatusCode(500);
             }
         }
 
@@ -141,51 +164,59 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult> ChangePassword(ChangePasswordInput input)
         {
-            byte[] salt = new byte[128 / 8];
-            using (var rng = RandomNumberGenerator.Create())
+            try
             {
-                rng.GetBytes(salt);
-            }
-
-            var exists = _context.Users.Any(x => x.Username == input.username);
-            if (exists)
-            {
-                DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
-                var user = await _context.Users.Where(x => x.Username == input.username).FirstOrDefaultAsync();
-
-                if (PasswordHashHelper.GetHash(input.old_password, user.Salt) == user.Password)
+                byte[] salt = new byte[128 / 8];
+                using (var rng = RandomNumberGenerator.Create())
                 {
-                    var token = _context.Tokens.FirstOrDefault(x => x.UserID == user.Id);
-                    user.Password = PasswordHashHelper.GetHash(input.new_password, salt);
-                    user.Salt = salt;
-                    _context.Entry(user).State = EntityState.Modified;
+                    rng.GetBytes(salt);
+                }
 
-                    token.Token = TokenHelper.GenerateToken(input.username);
-                    _context.Entry(token).State = EntityState.Modified;
+                var exists = _context.Users.Any(x => x.Username == input.username);
+                if (exists)
+                {
+                    DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
+                    var user = await _context.Users.Where(x => x.Username == input.username).FirstOrDefaultAsync();
 
-                    await _context.SaveChangesAsync();
-
-                    if (DataSyncEnabled)
+                    if (PasswordHashHelper.GetHash(input.old_password, user.Salt) == user.Password)
                     {
-                        await dataSyncManager.SyncUsers(user, DataSyncManager.DbSyncMethod.Update);
-                        await dataSyncManager.SyncTokens(token, user, DataSyncManager.DbSyncMethod.Update);
+                        var token = _context.Tokens.FirstOrDefault(x => x.UserID == user.Id);
+                        user.Password = PasswordHashHelper.GetHash(input.new_password, salt);
+                        user.Salt = salt;
+                        _context.Entry(user).State = EntityState.Modified;
+
+                        token.Token = TokenHelper.GenerateToken(input.username);
+                        _context.Entry(token).State = EntityState.Modified;
+
+                        await _context.SaveChangesAsync();
+
+                        if (DataSyncEnabled)
+                        {
+                            await dataSyncManager.SyncUsers(user, DataSyncManager.DbSyncMethod.Update);
+                            await dataSyncManager.SyncTokens(token, user, DataSyncManager.DbSyncMethod.Update);
+                        }
+
+                        StatusOutput output = new StatusOutput()
+                        {
+                            message = "Password changed"
+                        };
+
+                        return Ok(output);
                     }
-
-                    StatusOutput output = new StatusOutput()
+                    else
                     {
-                        message = "Password changed"
-                    };
-
-                    return Ok(output);
+                        return Unauthorized();
+                    }
                 }
                 else
                 {
                     return Unauthorized();
                 }
             }
-            else
+            catch (Exception e)
             {
-                return Unauthorized();
+                Log.Fatal(e, $"{nameof(ChangePassword)}");
+                return StatusCode(500);
             }
         }
 
