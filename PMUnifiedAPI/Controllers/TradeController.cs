@@ -14,6 +14,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using PMCommonApiModels.RequestModels;
 using PMCommonApiModels.ResponseModels;
+using PMCommonEntities.Models;
 using PMUnifiedAPI.Models;
 using PMDataSynchronizer;
 using PMUnifiedAPI.Helpers;
@@ -38,14 +39,16 @@ namespace PMUnifiedAPI.Controllers
         private readonly IOptions<PseudoMarketsConfig> config;
         private string SyncDbConnectionString = "";
         private bool DataSyncEnabled = false;
+        private DateTimeHelper _dateTimeHelper;
 
-        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
+        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, DateTimeHelper dateTimeHelper)
         {
             _context = context;
             config = appConfig;
             baseUrl = config.Value.AppBaseUrl;
             SyncDbConnectionString = config.Value.DataSyncTargetDb;
             DataSyncEnabled = config.Value.DataSyncEnabled;
+            _dateTimeHelper = dateTimeHelper;
         }
 
         // POST: /api/Trade/Execute
@@ -83,262 +86,272 @@ namespace PMUnifiedAPI.Controllers
                             {
                                 if (price > 0 && input.Quantity > 0)
                                 {
-                                    Orders order = new Orders()
+                                    if (_dateTimeHelper.IsMarketOpen() && !_dateTimeHelper.IsMarketHoliday())
                                     {
-                                        Symbol = input.Symbol,
-                                        Type = input.Type,
-                                        Price = price,
-                                        Quantity = input.Quantity,
-                                        Date = DateTime.Now,
-                                        TransactionID = transactionId
-                                    };
-
-                                    Transactions transaction = new Transactions()
-                                    {
-                                        AccountId = account.Id,
-                                        TransactionId = transactionId
-                                    };
-
-                                    _context.Orders.Add(order);
-                                    _context.Transactions.Add(transaction);
-                                    await _context.SaveChangesAsync();
-
-                                    if (DataSyncEnabled)
-                                    {
-                                        Orders replicatedOrder = new Orders()
-                                        {
-                                            Symbol = order.Symbol,
-                                            Type = order.Type,
-                                            Price = order.Price,
-                                            Quantity = order.Quantity,
-                                            TransactionID = order.TransactionID,
-                                            Date = DateTime.Now
-                                        };
-
-                                        Transactions replicatedTransaction = new Transactions()
-                                        {
-                                            TransactionId = order.TransactionID
-                                        };
-
-                                        await dataSyncManager.SyncOrders(replicatedOrder, user, DataSyncManager.DbSyncMethod.Insert);
-                                        await dataSyncManager.SyncTransactions(replicatedTransaction, user, DataSyncManager.DbSyncMethod.Insert);
-                                    }
-
-                                    var createdOrder = await _context.Orders.FirstOrDefaultAsync(x => x.TransactionID == transactionId);
-
-                                    if (input.Type.ToUpper() == "BUY")
-                                    {
-                                        var doesAccountHaveExistingPosition =
-                                            _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                        if (doesAccountHaveExistingPosition == true)
-                                        {
-                                            var existingPosition = await _context.Positions
-                                                .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
-                                            // Long position
-                                            if (existingPosition.Quantity > 0)
+                                            Orders order = new Orders()
                                             {
-                                                existingPosition.Value += value;
-                                                existingPosition.Quantity += input.Quantity;
-                                                _context.Entry(existingPosition).State = EntityState.Modified;
-                                                account.Balance = account.Balance - value;
-                                                _context.Entry(account).State = EntityState.Modified;
-                                                await _context.SaveChangesAsync();
+                                                Symbol = input.Symbol,
+                                                Type = input.Type,
+                                                Price = price,
+                                                Quantity = input.Quantity,
+                                                Date = DateTime.Now,
+                                                TransactionID = transactionId
+                                            };
 
-                                                if (DataSyncEnabled)
+                                            Transactions transaction = new Transactions()
+                                            {
+                                                AccountId = account.Id,
+                                                TransactionId = transactionId
+                                            };
+
+                                            _context.Orders.Add(order);
+                                            _context.Transactions.Add(transaction);
+                                            await _context.SaveChangesAsync();
+
+                                            if (DataSyncEnabled)
+                                            {
+                                                Orders replicatedOrder = new Orders()
                                                 {
+                                                    Symbol = order.Symbol,
+                                                    Type = order.Type,
+                                                    Price = order.Price,
+                                                    Quantity = order.Quantity,
+                                                    TransactionID = order.TransactionID,
+                                                    Date = DateTime.Now
+                                                };
 
-                                                    await dataSyncManager.SyncPositions(existingPosition, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
-                                                    await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
+                                                Transactions replicatedTransaction = new Transactions()
+                                                {
+                                                    TransactionId = order.TransactionID
+                                                };
 
-                                                }
-
+                                                await dataSyncManager.SyncOrders(replicatedOrder, user, DataSyncManager.DbSyncMethod.Insert);
+                                                await dataSyncManager.SyncTransactions(replicatedTransaction, user, DataSyncManager.DbSyncMethod.Insert);
                                             }
-                                            else // Short position
-                                            {
-                                                if (Math.Abs(existingPosition.Quantity) == input.Quantity)
-                                                {
-                                                    double gainOrLoss = existingPosition.Value - value;
-                                                    account.Balance += gainOrLoss;
-                                                    _context.Entry(account).State = EntityState.Modified;
-                                                    _context.Entry(existingPosition).State = EntityState.Deleted;
-                                                    await _context.SaveChangesAsync();
 
-                                                    if (DataSyncEnabled)
+                                            var createdOrder = await _context.Orders.FirstOrDefaultAsync(x => x.TransactionID == transactionId);
+
+                                            if (input.Type.ToUpper() == "BUY")
+                                            {
+                                                var doesAccountHaveExistingPosition =
+                                                    _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
+                                                if (doesAccountHaveExistingPosition == true)
+                                                {
+                                                    var existingPosition = await _context.Positions
+                                                        .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
+                                                    // Long position
+                                                    if (existingPosition.Quantity > 0)
                                                     {
-                                                        await dataSyncManager.SyncAccounts(account, user,
-                                                            DataSyncManager.DbSyncMethod.Update);
-                                                        await dataSyncManager.SyncPositions(existingPosition, user,
-                                                            DataSyncManager.DbSyncMethod.Delete);
+                                                        existingPosition.Value += value;
+                                                        existingPosition.Quantity += input.Quantity;
+                                                        _context.Entry(existingPosition).State = EntityState.Modified;
+                                                        account.Balance = account.Balance - value;
+                                                        _context.Entry(account).State = EntityState.Modified;
+                                                        await _context.SaveChangesAsync();
+
+                                                        if (DataSyncEnabled)
+                                                        {
+
+                                                            await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                            await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
+
+                                                        }
+
+                                                    }
+                                                    else // Short position
+                                                    {
+                                                        if (Math.Abs(existingPosition.Quantity) == input.Quantity)
+                                                        {
+                                                            double gainOrLoss = existingPosition.Value - value;
+                                                            account.Balance += gainOrLoss;
+                                                            _context.Entry(account).State = EntityState.Modified;
+                                                            _context.Entry(existingPosition).State = EntityState.Deleted;
+                                                            await _context.SaveChangesAsync();
+
+                                                            if (DataSyncEnabled)
+                                                            {
+                                                                await dataSyncManager.SyncAccounts(account, user,
+                                                                    DataSyncManager.DbSyncMethod.Update);
+                                                                await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                    DataSyncManager.DbSyncMethod.Delete);
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            existingPosition.Value = existingPosition.Value - value;
+                                                            existingPosition.Quantity += input.Quantity;
+                                                            account.Balance += existingPosition.Value - value;
+                                                            _context.Entry(existingPosition).State = EntityState.Modified;
+                                                            _context.Entry(account).State = EntityState.Modified;
+                                                            await _context.SaveChangesAsync();
+
+                                                            if (DataSyncEnabled)
+                                                            {
+
+                                                                await dataSyncManager.SyncAccounts(account, user,
+                                                                    DataSyncManager.DbSyncMethod.Update);
+                                                                await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                    DataSyncManager.DbSyncMethod.Update);
+
+                                                            }
+                                                        }
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    existingPosition.Value = existingPosition.Value - value;
-                                                    existingPosition.Quantity += input.Quantity;
-                                                    account.Balance += existingPosition.Value - value;
-                                                    _context.Entry(existingPosition).State = EntityState.Modified;
+                                                    Positions position = new Positions()
+                                                    {
+                                                        AccountId = account.Id,
+                                                        OrderId = createdOrder.Id,
+                                                        Value = value,
+                                                        Symbol = input.Symbol,
+                                                        Quantity = input.Quantity
+                                                    };
+                                                    _context.Positions.Add(position);
+                                                    await _context.SaveChangesAsync();
+
+                                                    account.Balance = account.Balance - value;
                                                     _context.Entry(account).State = EntityState.Modified;
                                                     await _context.SaveChangesAsync();
 
                                                     if (DataSyncEnabled)
                                                     {
+                                                        Positions replicatedPosition = new Positions()
+                                                        {
+                                                            OrderId = createdOrder.Id,
+                                                            Value = value,
+                                                            Symbol = input.Symbol,
+                                                            Quantity = input.Quantity
+                                                        };
 
-                                                        await dataSyncManager.SyncAccounts(account, user,
-                                                            DataSyncManager.DbSyncMethod.Update);
-                                                        await dataSyncManager.SyncPositions(existingPosition, user,
-                                                            DataSyncManager.DbSyncMethod.Update);
-
+                                                        await dataSyncManager.SyncPositions(replicatedPosition, user,
+                                                            DataSyncManager.DbSyncMethod.Insert);
+                                                        await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
                                                     }
                                                 }
                                             }
-                                        }
-                                        else
-                                        {
-                                            Positions position = new Positions()
+                                            else if (input.Type.ToUpper() == "SELL")
                                             {
-                                                AccountId = account.Id,
-                                                OrderId = createdOrder.Id,
-                                                Value = value,
-                                                Symbol = input.Symbol,
-                                                Quantity = input.Quantity
-                                            };
-                                            _context.Positions.Add(position);
-                                            await _context.SaveChangesAsync();
-
-                                            account.Balance = account.Balance - value;
-                                            _context.Entry(account).State = EntityState.Modified;
-                                            await _context.SaveChangesAsync();
-
-                                            if (DataSyncEnabled)
-                                            {
-                                                Positions replicatedPosition = new Positions()
+                                                var doesAccountHaveExistingPosition =
+                                                    _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
+                                                if (doesAccountHaveExistingPosition == true)
                                                 {
-                                                    OrderId = createdOrder.Id,
-                                                    Value = value,
-                                                    Symbol = input.Symbol,
-                                                    Quantity = input.Quantity
-                                                };
+                                                    var existingPosition = await _context.Positions
+                                                        .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
+                                                    if (input.Quantity == existingPosition.Quantity)
+                                                    {
+                                                        account.Balance = account.Balance + value;
+                                                        _context.Entry(existingPosition).State = EntityState.Deleted;
+                                                        _context.Entry(account).State = EntityState.Modified;
+                                                        await _context.SaveChangesAsync();
 
-                                                await dataSyncManager.SyncPositions(replicatedPosition, user,
-                                                    DataSyncManager.DbSyncMethod.Insert);
-                                                await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
-                                            }
-                                        }
-                                    }
-                                    else if (input.Type.ToUpper() == "SELL")
-                                    {
-                                        var doesAccountHaveExistingPosition =
-                                            _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                        if (doesAccountHaveExistingPosition == true)
-                                        {
-                                            var existingPosition = await _context.Positions
-                                                .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
-                                            if (input.Quantity == existingPosition.Quantity)
-                                            {
-                                                account.Balance = account.Balance + value;
-                                                _context.Entry(existingPosition).State = EntityState.Deleted;
-                                                _context.Entry(account).State = EntityState.Modified;
-                                                await _context.SaveChangesAsync();
+                                                        if (DataSyncEnabled)
+                                                        {
+                                                            await dataSyncManager.SyncAccounts(account, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                            await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                DataSyncManager.DbSyncMethod.Delete);
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        existingPosition.Value -= value;
+                                                        existingPosition.Quantity -= input.Quantity;
+                                                        _context.Entry(existingPosition).State = EntityState.Modified;
+                                                        account.Balance = account.Balance + value;
+                                                        _context.Entry(account).State = EntityState.Modified;
+                                                        await _context.SaveChangesAsync();
 
-                                                if (DataSyncEnabled)
+                                                        if (DataSyncEnabled)
+                                                        {
+                                                            await dataSyncManager.SyncAccounts(account, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                            await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                        }
+                                                    }
+                                                }
+                                                else
                                                 {
-                                                    await dataSyncManager.SyncAccounts(account, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
-                                                    await dataSyncManager.SyncPositions(existingPosition, user,
-                                                        DataSyncManager.DbSyncMethod.Delete);
+                                                    output.Status = StatusMessages.InvalidPositionsMessage + input.Symbol;
+                                                    return Ok(output);
                                                 }
                                             }
-                                            else
+                                            else if (input.Type.ToUpper() == "SELLSHORT")
                                             {
-                                                existingPosition.Value -= value;
-                                                existingPosition.Quantity -= input.Quantity;
-                                                _context.Entry(existingPosition).State = EntityState.Modified;
-                                                account.Balance = account.Balance + value;
-                                                _context.Entry(account).State = EntityState.Modified;
-                                                await _context.SaveChangesAsync();
-
-                                                if (DataSyncEnabled)
+                                                var doesAccountHaveExistingPosition =
+                                                    _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
+                                                if (doesAccountHaveExistingPosition == true)
                                                 {
-                                                    await dataSyncManager.SyncAccounts(account, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
-                                                    await dataSyncManager.SyncPositions(existingPosition, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
+                                                    var existingPosition = await _context.Positions
+                                                        .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol)
+                                                        .FirstOrDefaultAsync();
+                                                    if (existingPosition.Quantity > 0)
+                                                    {
+                                                        _context.Entry(createdOrder).State = EntityState.Deleted;
+                                                        await _context.SaveChangesAsync();
+                                                        if (DataSyncEnabled)
+                                                        {
+                                                            await dataSyncManager.SyncOrders(createdOrder, user, DataSyncManager.DbSyncMethod.Delete);
+                                                        }
+
+                                                        output.Status =
+                                                            StatusMessages.InvalidShortPositionMessage;
+                                                        return Ok(output);
+                                                    }
+                                                    else
+                                                    {
+                                                        existingPosition.Value += value;
+                                                        existingPosition.Quantity += input.Quantity * -1;
+                                                        _context.Entry(existingPosition).State = EntityState.Modified;
+                                                        await _context.SaveChangesAsync();
+
+                                                        if (DataSyncEnabled)
+                                                        {
+                                                            await dataSyncManager.SyncAccounts(account, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                            await dataSyncManager.SyncPositions(existingPosition, user,
+                                                                DataSyncManager.DbSyncMethod.Update);
+                                                        }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    Positions position = new Positions()
+                                                    {
+                                                        AccountId = account.Id,
+                                                        OrderId = createdOrder.Id,
+                                                        Value = value,
+                                                        Symbol = input.Symbol,
+                                                        Quantity = input.Quantity * -1
+                                                    };
+
+                                                    _context.Positions.Add(position);
+                                                    account.Balance = account.Balance - value;
+                                                    _context.Entry(account).State = EntityState.Modified;
+                                                    await _context.SaveChangesAsync();
+
+                                                    if (DataSyncEnabled)
+                                                    {
+                                                        await dataSyncManager.SyncPositions(position, user,
+                                                            DataSyncManager.DbSyncMethod.Insert);
+                                                        await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
+                                                    }
                                                 }
                                             }
-                                        }
-                                        else
-                                        {
-                                            output.Status = StatusMessages.InvalidPositionsMessage + input.Symbol;
+
+                                            output.Status = StatusMessages.SuccessMessage;
+                                            output.Order = createdOrder;
                                             return Ok(output);
-                                        }
                                     }
-                                    else if (input.Type.ToUpper() == "SELLSHORT")
+                                    else
                                     {
-                                        var doesAccountHaveExistingPosition =
-                                            _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                        if (doesAccountHaveExistingPosition == true)
-                                        {
-                                            var existingPosition = await _context.Positions
-                                                .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol)
-                                                .FirstOrDefaultAsync();
-                                            if (existingPosition.Quantity > 0)
-                                            {
-                                                _context.Entry(createdOrder).State = EntityState.Deleted;
-                                                await _context.SaveChangesAsync();
-                                                if (DataSyncEnabled)
-                                                {
-                                                    await dataSyncManager.SyncOrders(createdOrder, user, DataSyncManager.DbSyncMethod.Delete);
-                                                }
-
-                                                output.Status =
-                                                    StatusMessages.InvalidShortPositionMessage;
-                                                return Ok(output);
-                                            }
-                                            else
-                                            {
-                                                existingPosition.Value += value;
-                                                existingPosition.Quantity += input.Quantity * -1;
-                                                _context.Entry(existingPosition).State = EntityState.Modified;
-                                                await _context.SaveChangesAsync();
-
-                                                if (DataSyncEnabled)
-                                                {
-                                                    await dataSyncManager.SyncAccounts(account, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
-                                                    await dataSyncManager.SyncPositions(existingPosition, user,
-                                                        DataSyncManager.DbSyncMethod.Update);
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            Positions position = new Positions()
-                                            {
-                                                AccountId = account.Id,
-                                                OrderId = createdOrder.Id,
-                                                Value = value,
-                                                Symbol = input.Symbol,
-                                                Quantity = input.Quantity * -1
-                                            };
-
-                                            _context.Positions.Add(position);
-                                            account.Balance = account.Balance - value;
-                                            _context.Entry(account).State = EntityState.Modified;
-                                            await _context.SaveChangesAsync();
-
-                                            if (DataSyncEnabled)
-                                            {
-                                                await dataSyncManager.SyncPositions(position, user,
-                                                    DataSyncManager.DbSyncMethod.Insert);
-                                                await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
-                                            }
-                                        }
+                                        CreateQueuedOrder(input, userId);
+                                        output.Status =
+                                            "Market is closed, order has been queued to be filled on next market open";
+                                        return Ok(output);
                                     }
-
-                                    output.Status = StatusMessages.SuccessMessage;
-                                    output.Order = createdOrder;
-                                    return Ok(output);
                                 }
                                 else
                                 {
@@ -387,6 +400,30 @@ namespace PMUnifiedAPI.Controllers
 
                     return Ok(status);
                 }
+            }
+        }
+
+        private void CreateQueuedOrder(TradeExecInput input, int userId)
+        {
+            try
+            {
+                QueuedOrders order = new QueuedOrders()
+                {
+                    OrderDate = DateTime.Today,
+                    OrderType = input.Type,
+                    Quantity = input.Quantity,
+                    Symbol = input.Symbol,
+                    UserId = userId,
+                    IsOpenOrder = true
+                };
+
+                _context.QueuedOrders.Add(order);
+
+                _context.SaveChanges();
+            }
+            catch (Exception e)
+            {
+                Log.Fatal(e, $"{nameof(CreateQueuedOrder)}");
             }
         }
 

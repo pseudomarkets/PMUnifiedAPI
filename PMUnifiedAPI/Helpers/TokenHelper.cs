@@ -65,13 +65,13 @@ namespace PMUnifiedAPI.Helpers
             return status;
         }
 
-        public static string GenerateToken(string username)
+        public static string GenerateToken(string username, TokenType type)
         {
             var token = new JwtBuilder()
                 .WithAlgorithm(new HMACSHA256Algorithm())
                 .WithSecret(secret)
                 .AddClaim("sub", username)
-                .AddClaim("typ", TokenType.Standard)
+                .AddClaim("typ", type)
                 .AddClaim("iss", issuer)
                 .AddClaim("src", source)
                 .AddClaim("ts", DateTime.Now)

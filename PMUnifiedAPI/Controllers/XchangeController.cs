@@ -14,6 +14,13 @@ using NetMQ.Sockets;
 using PMCommonEntities.Models.PseudoXchange.OrderEntryModels;
 using PMUnifiedAPI.Models;
 
+/*
+ * Pseudo Markets Unified Web API
+ * PseudoXchange API
+ * Author: Shravan Jambukesan <shravan@shravanj.com>
+ * (c) 2019 - 2020 Pseudo Markets
+ */
+
 namespace PMUnifiedAPI.Controllers
 {
     [Route("api/[controller]")]

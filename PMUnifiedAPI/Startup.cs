@@ -12,6 +12,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PMUnifiedAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using PMUnifiedAPI.Helpers;
+using PMUnifiedAPI.Interfaces;
 
 namespace PMUnifiedAPI
 {
@@ -29,6 +31,7 @@ namespace PMUnifiedAPI
         {
             services.AddDbContext<PseudoMarketsDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("PMDB")));
             services.Configure<PseudoMarketsConfig>(Configuration.GetSection("PMConfig"));
+            services.AddScoped<DateTimeHelper>();
             services.AddControllers();
         }
 

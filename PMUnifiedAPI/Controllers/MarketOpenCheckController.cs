@@ -7,7 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using PMCommonApiModels.ResponseModels;
+using PMUnifiedAPI.Helpers;
 using PMUnifiedAPI.Models;
+
+/*
+ * Pseudo Markets Unified Web API
+ * Market Status API
+ * Author: Shravan Jambukesan <shravan@shravanj.com>
+ * (c) 2019 - 2020 Pseudo Markets
+ */
 
 namespace PMUnifiedAPI.Controllers
 {
@@ -15,13 +23,18 @@ namespace PMUnifiedAPI.Controllers
     [ApiController]
     public class MarketOpenCheckController : ControllerBase
     {
-        // GET: api/MaketOpenCheck
+        private DateTimeHelper _dateTimeHelper;
+        public MarketOpenCheckController(DateTimeHelper dateTimeHelper)
+        {
+            _dateTimeHelper = dateTimeHelper;
+        }
+
+        // GET: /api/MaketOpenCheck
         [HttpGet]
-        public ActionResult Get(int id)
+        public ActionResult Get()
         {
             MarketStatusOutput output = new MarketStatusOutput();
-            if (DateTime.Now.ToUniversalTime() >= new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 13, 30, 0).ToUniversalTime() &&
-                DateTime.Now.ToUniversalTime() <= new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 20, 0, 0).ToUniversalTime())
+            if (_dateTimeHelper.IsMarketOpen() && !_dateTimeHelper.IsMarketHoliday())
             {
                 output.MarketStatus = StatusMessages.MarketIsOpenMessage;
             }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using PMCommonEntities.Models;
 
 /*
  * Pseudo Markets Unified Web API
@@ -27,5 +28,7 @@ namespace PMUnifiedAPI.Models
         public DbSet<Positions> Positions { get; set; }
         public DbSet<Orders> Orders { get; set; }
         public DbSet<Transactions> Transactions { get; set; }
+        public DbSet<QueuedOrders> QueuedOrders { get; set; }
+        public DbSet<MarketHolidays> MarketHolidays { get; set; }
     }
 }

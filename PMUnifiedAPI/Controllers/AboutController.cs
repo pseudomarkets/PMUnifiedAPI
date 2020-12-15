@@ -9,6 +9,13 @@ using Newtonsoft.Json;
 using PMCommonApiModels.ResponseModels;
 using PMUnifiedAPI.Models;
 
+/*
+ * Pseudo Markets Unified Web API
+ * About API
+ * Author: Shravan Jambukesan <shravan@shravanj.com>
+ * (c) 2019 - 2020 Pseudo Markets
+ */
+
 namespace PMUnifiedAPI.Controllers
 {
     [Route("api/[controller]")]
@@ -26,7 +33,7 @@ namespace PMUnifiedAPI.Controllers
         [HttpGet]
         public ActionResult About()
         {
-            return Ok("Pseudo Markets Unified API" + "\n" + "Version: " + config.Value.AppVersion + "\n" + "Server: " + config.Value.ServerId + "\n" + "Environment: " + config.Value.Environment + "\n" + "Data Sync Enabled: " + config.Value.DataSyncEnabled + "\n" + "(c) 2019 - 2020 Pseudo Markets");
+            return Ok("Pseudo Markets Unified API" + "\n" + "Version: " + config.Value.AppVersion + "\n" + "Server: " + config.Value.ServerId + "\n" + "Environment: " + config.Value.Environment + "\n" + "Data Sync Enabled: " + config.Value.DataSyncEnabled + "\n" + $"(c) 2019 - {DateTime.Now.Year} Pseudo Markets");
         }
 
         [Route("AboutJson")]
@@ -40,7 +47,7 @@ namespace PMUnifiedAPI.Controllers
                 ServerId = config.Value.ServerId,
                 Environment = config.Value.Environment,
                 DataSyncEnabled = config.Value.DataSyncEnabled,
-                Copyright = "(c) 2019 - 2020 Pseudo Markets"
+                Copyright = $"(c) 2019 - {DateTime.Now.Year} Pseudo Markets"
             };
 
             var response = JsonConvert.SerializeObject(jsonResponse);

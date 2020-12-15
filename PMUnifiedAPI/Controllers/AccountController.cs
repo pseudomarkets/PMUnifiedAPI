@@ -17,6 +17,13 @@ using PMUnifiedAPI.Helpers;
 using Serilog;
 using TwelveDataSharp;
 
+/*
+ * Pseudo Markets Unified Web API
+ * Account API
+ * Author: Shravan Jambukesan <shravan@shravanj.com>
+ * (c) 2019 - 2020 Pseudo Markets
+ */
+
 namespace PMUnifiedAPI.Controllers
 {
     [Route("api/[controller]")]
@@ -206,11 +213,12 @@ namespace PMUnifiedAPI.Controllers
                         double investmentGainOrLoss = 0;
                         double investmentGainOrLossPercentage = 0;
 
+                        TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+
                         foreach (Positions p in positions)
                         {
                             totalInvestedValue += p.Value;
                             string symbol = p.Symbol;
-                            TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
                             var latestPrice = await twelveDataClient.GetRealTimePriceAsync(symbol);
                             totalCurrentValue += latestPrice.Price * p.Quantity;
                             numPositions++;
