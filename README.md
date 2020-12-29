@@ -8,7 +8,7 @@ List of current official Pseudo Markets instances (updated with every commit).
 https://docs.google.com/spreadsheets/d/1E3U0WuU64ZSKW41NIDrM9nCq-1atvdQ4gBdHlo2CQWo/edit?usp=sharing
 
 # Demo
-You can lookup stock and ETF price qoutes without creating an account, for example: https://app2.pseudomarkets.live/api/Quotes/LatestPrice/AAPL
+You can lookup stock and ETF price qoutes without creating an account, for example: https://app.pseudomarkets.live/api/Quotes/LatestPrice/AAPL
 
 # Requirements
 You'll need the following to build, run, debug, and host the Pseudo Markets Web API
