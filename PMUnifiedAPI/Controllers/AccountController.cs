@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,8 +14,10 @@ using Newtonsoft.Json;
 using PMUnifiedAPI.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using PMCommonApiModels.RequestModels;
 using PMCommonApiModels.ResponseModels;
+using PMCommonEntities.Models.PerformanceReporting;
 using PMUnifiedAPI.Helpers;
 using Serilog;
 using TwelveDataSharp;
@@ -33,15 +38,21 @@ namespace PMUnifiedAPI.Controllers
         private readonly PseudoMarketsDbContext _context;
         private string baseUrl = "";
         private readonly IOptions<PseudoMarketsConfig> config;
-        private string twelveDataApiKey = string.Empty;
+        private string _twelveDataApiKey = string.Empty;
+        private readonly string _portfolioPerformanceApiBaseUrl;
+        private readonly string _internalServiceAuthUsername;
+        private readonly string _internalServiceAuthPassword;
 
         public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
             config = appConfig;
             baseUrl = config.Value.AppBaseUrl;
-            twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
+            _twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
                 .FirstOrDefault();
+            _portfolioPerformanceApiBaseUrl = config.Value.PerformanceReportingApiUrl;
+            _internalServiceAuthUsername = config.Value.InternalServiceUsername;
+            _internalServiceAuthPassword = config.Value.InternalServicePassword;
         }
 
         // POST: /api/Account/Positions
@@ -56,8 +67,7 @@ namespace PMUnifiedAPI.Controllers
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
-                            tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts).FirstOrDefaultAsync();
+                        var account = await GetAccountFromToken(input.Token);
 
                         var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
                         return Ok(positions);
@@ -102,8 +112,7 @@ namespace PMUnifiedAPI.Controllers
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
-                            tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts).FirstOrDefaultAsync();
+                        var account = await GetAccountFromToken(input.Token);
 
                         var transactions = await _context.Transactions.Where(x => x.AccountId == account.Id).ToListAsync();
 
@@ -151,9 +160,7 @@ namespace PMUnifiedAPI.Controllers
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
-                                tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
-                            .FirstOrDefaultAsync();
+                        var account = await GetAccountFromToken(input.Token);
 
                         AccountBalanceOutput output = new AccountBalanceOutput()
                         {
@@ -190,6 +197,64 @@ namespace PMUnifiedAPI.Controllers
             }
         }
 
+        // POST: /api/Account/PortfolioPerformance
+        [HttpPost]
+        [Route("PortfolioPerformance/{date}")]
+        public async Task<ActionResult> ViewPortfolioPerformance([FromBody] ViewAccount input, string date)
+        {
+            try
+            {
+                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                switch (tokenStatus)
+                {
+                    case TokenHelper.TokenStatus.Valid:
+                    {
+                        var account = await GetAccountFromToken(input.Token);
+
+                        var accountId = account.Id;
+
+                        HttpClient client = new HttpClient()
+                        {
+                            BaseAddress = new Uri(_portfolioPerformanceApiBaseUrl)
+                        };
+
+
+                        var byteArray = Encoding.ASCII.GetBytes($"{_internalServiceAuthUsername}:{_internalServiceAuthPassword}");
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
+
+                        var response = await client.GetStringAsync($"PerformanceReport/GetPerformanceReport/{accountId}/{date}");
+
+                        var responseJson = JsonConvert.DeserializeObject<PortfolioPerformanceReport>(response);
+
+                        return Ok(responseJson);
+                    }
+                    case TokenHelper.TokenStatus.Expired:
+                    {
+                        StatusOutput status = new StatusOutput()
+                        {
+                            message = StatusMessages.ExpiredTokenMessage
+                        };
+
+                        return Ok(status);
+                    }
+                    default:
+                    {
+                        StatusOutput status = new StatusOutput()
+                        {
+                            message = StatusMessages.InvalidTokenMessage
+                        };
+
+                        return Ok(status);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Fatal(e, $"{nameof(ViewSummary)}");
+                return StatusCode(500);
+            }
+        }
+
         // POST: /api/Account/Summary
         [HttpPost]
         [Route("Summary")]
@@ -202,51 +267,24 @@ namespace PMUnifiedAPI.Controllers
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await _context.Tokens.Where(x => x.Token == input.Token).Join(_context.Accounts,
-                                tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
-                            .FirstOrDefaultAsync();
+                        var account = await GetAccountFromToken(input.Token);
 
-                        var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
-                        double totalInvestedValue = 0;
-                        int numPositions = 0;
-                        double totalCurrentValue = 0;
-                        double investmentGainOrLoss = 0;
-                        double investmentGainOrLossPercentage = 0;
+                        var accountId = account.Id;
 
-                        TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
-
-                        foreach (Positions p in positions)
+                        HttpClient client = new HttpClient()
                         {
-                            totalInvestedValue += p.Value;
-                            string symbol = p.Symbol;
-                            var latestPrice = await twelveDataClient.GetRealTimePriceAsync(symbol);
-                            totalCurrentValue += latestPrice.Price * p.Quantity;
-                            numPositions++;
-                        }
-
-                        investmentGainOrLoss = totalCurrentValue - totalInvestedValue;
-
-                        if (investmentGainOrLoss > 0)
-                        {
-                            investmentGainOrLossPercentage = (investmentGainOrLoss / totalInvestedValue) * 100;
-                        }
-                        else
-                        {
-                            investmentGainOrLossPercentage = (-1 * (investmentGainOrLoss / totalInvestedValue)) * 100;
-                        }
-
-                        AccountSummaryOutput output = new AccountSummaryOutput()
-                        {
-                            AccountId = account.Id,
-                            AccountBalance = account.Balance,
-                            TotalCurrentValue = totalCurrentValue,
-                            TotalInvestedValue = totalInvestedValue,
-                            NumberOfPositions = numPositions,
-                            InvestmentGainOrLoss = investmentGainOrLoss,
-                            InvestmentGainOrLossPercentage = investmentGainOrLossPercentage
+                            BaseAddress = new Uri(_portfolioPerformanceApiBaseUrl)
                         };
 
-                        return Ok(output);
+
+                        var byteArray = Encoding.ASCII.GetBytes($"{_internalServiceAuthUsername}:{_internalServiceAuthPassword}");
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
+
+                        var response = await client.GetStringAsync($"PerformanceReport/GetCurrentPerformance/{accountId}");
+
+                        var responseJson = JsonConvert.DeserializeObject<PortfolioPerformanceReport>(response);
+
+                        return Ok(responseJson);
 
                     }
                     case TokenHelper.TokenStatus.Expired:
@@ -274,6 +312,15 @@ namespace PMUnifiedAPI.Controllers
                 Log.Fatal(e, $"{nameof(ViewSummary)}");
                 return StatusCode(500);
             }
+        }
+
+        private async Task<Accounts> GetAccountFromToken(string token)
+        {
+            var account = await _context.Tokens.Where(x => x.Token == token).Join(_context.Accounts,
+                    tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
+                .FirstOrDefaultAsync();
+
+            return account;
         }
     }
 }

@@ -26,5 +26,8 @@ namespace PMUnifiedAPI.Models
         public int AerospikeServerPort { get; set; } 
         public bool XchangeEnabled { get; set; }
         public string TokenIssuer { get; set; }
+        public string PerformanceReportingApiUrl { get; set; }
+        public string InternalServiceUsername { get; set; }
+        public string InternalServicePassword { get; set; }
     }
 }

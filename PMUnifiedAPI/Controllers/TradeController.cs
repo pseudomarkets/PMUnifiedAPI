@@ -80,6 +80,7 @@ namespace PMUnifiedAPI.Controllers
 
                         DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
 
+                        // TODO: Extract trade logic into a separate static class
                         if (hasSufficientBalance)
                         {
                             if (input.Type.ToUpper() == "BUY" || input.Type.ToUpper() == "SELL" || input.Type.ToUpper() == "SELLSHORT")
@@ -274,7 +275,7 @@ namespace PMUnifiedAPI.Controllers
                                                 }
                                                 else
                                                 {
-                                                    output.Status = StatusMessages.InvalidPositionsMessage + input.Symbol;
+                                                    output.StatusCode = TradeStatusCodes.ExecutionError;
                                                     return Ok(output);
                                                 }
                                             }
@@ -296,8 +297,7 @@ namespace PMUnifiedAPI.Controllers
                                                             await dataSyncManager.SyncOrders(createdOrder, user, DataSyncManager.DbSyncMethod.Delete);
                                                         }
 
-                                                        output.Status =
-                                                            StatusMessages.InvalidShortPositionMessage;
+                                                        output.StatusCode = TradeStatusCodes.ExecutionError;
                                                         return Ok(output);
                                                     }
                                                     else
@@ -341,33 +341,32 @@ namespace PMUnifiedAPI.Controllers
                                                 }
                                             }
 
-                                            output.Status = StatusMessages.SuccessMessage;
+                                            output.StatusCode = TradeStatusCodes.ExecutionOk;
                                             output.Order = createdOrder;
                                             return Ok(output);
                                     }
                                     else
                                     {
                                         CreateQueuedOrder(input, userId);
-                                        output.Status =
-                                            "Market is closed, order has been queued to be filled on next market open";
+                                        output.StatusCode = TradeStatusCodes.ExecutionQueued;
                                         return Ok(output);
                                     }
                                 }
                                 else
                                 {
-                                    output.Status = StatusMessages.InvalidSymbolOrQuantityMessage;
+                                    output.StatusCode = TradeStatusCodes.ExecutionError;
                                     return Ok(output);
                                 }
                             }
                             else
                             {
-                                output.Status = StatusMessages.InvalidOrderTypeMessage;
+                                output.StatusCode = TradeStatusCodes.ExecutionError;
                                 return Ok(output);
                             }
                         }
                         else
                         {
-                            output.Status = StatusMessages.InsufficientBalanceMessage;
+                            output.StatusCode = TradeStatusCodes.ExecutionError;
                             return Ok(output);
                         }
 
