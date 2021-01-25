@@ -27,18 +27,19 @@ namespace PMUnifiedAPI.Controllers
     public class QuotesController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string iexApiKey = "";
-        private string avApiKey = "";
-        private string twelveDataApiKey = "";
-        private readonly IOptions<PseudoMarketsConfig> config;
+        private readonly string iexApiKey;
+        private readonly string _avApiKey;
+        private readonly string _twelveDataApiKey;
+        private readonly IOptions<PseudoMarketsConfig> _config;
 
+        // TODO: Move quotation endpoint to Market Data Service API
         public QuotesController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
-            config = appConfig;
+            _config = appConfig;
             iexApiKey = _context.ApiKeys.Where(x => x.ProviderName == "IEX").Select(x => x.ApiKey).FirstOrDefault();
-            avApiKey = _context.ApiKeys.Where(x => x.ProviderName == "AV").Select(x => x.ApiKey).FirstOrDefault();
-            twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
+            _avApiKey = _context.ApiKeys.Where(x => x.ProviderName == "AV").Select(x => x.ApiKey).FirstOrDefault();
+            _twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
                 .FirstOrDefault();
         }
 
@@ -75,7 +76,7 @@ namespace PMUnifiedAPI.Controllers
                     }
                     else
                     {
-                        TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                        TwelveDataClient twelveDataClient = new TwelveDataClient(_twelveDataApiKey);
                         var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
                         output.symbol = symbol;
                         output.price = price.Price;
@@ -85,7 +86,7 @@ namespace PMUnifiedAPI.Controllers
                 }
                 else
                 {
-                    TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                    TwelveDataClient twelveDataClient = new TwelveDataClient(_twelveDataApiKey);
                     var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
                     output.symbol = symbol;
                     output.price = price.Price;
@@ -131,13 +132,13 @@ namespace PMUnifiedAPI.Controllers
                 }
 
                 string avEndpoint = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + symbol + "&apikey=" +
-                           avApiKey;
+                           _avApiKey;
                 var avResponse = await client.GetAsync(avEndpoint);
                 string avJsonResponse = await avResponse.Content.ReadAsStringAsync();
                 var avQuote = JsonConvert.DeserializeObject<AlphaVantage.AlphaVantageGlobalQuote>(avJsonResponse);
                 avGloablQuote = Convert.ToDouble(avQuote?.GlobalQuote?.price);
 
-                TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                TwelveDataClient twelveDataClient = new TwelveDataClient(_twelveDataApiKey);
                 var price = await twelveDataClient.GetRealTimePriceAsync(symbol);
                 twelveDataRealTimePrice = price.Price;
 
@@ -196,7 +197,7 @@ namespace PMUnifiedAPI.Controllers
         {
             try
             {
-                TwelveDataClient twelveDataClient = new TwelveDataClient(twelveDataApiKey);
+                TwelveDataClient twelveDataClient = new TwelveDataClient(_twelveDataApiKey);
                 var detailedQuote = await twelveDataClient.GetQuoteAsync(symbol, interval);
                 DetailedQuoteOutput output = new DetailedQuoteOutput()
                 {
@@ -231,7 +232,7 @@ namespace PMUnifiedAPI.Controllers
             try
             {
                 var client = new HttpClient();
-                string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=SPX,IXIC,DJI&interval=1min&apikey=" + twelveDataApiKey;
+                string tdEndpoint = "https://api.twelvedata.com/time_series?symbol=SPX,IXIC,DJI&interval=1min&apikey=" + _twelveDataApiKey;
                 var tdResponse = await client.GetAsync(tdEndpoint);
                 string tdJsonResponse = await tdResponse.Content.ReadAsStringAsync();
                 var tdIndices = JsonConvert.DeserializeObject<TwelveData.TwelveDataIndices>(tdJsonResponse);

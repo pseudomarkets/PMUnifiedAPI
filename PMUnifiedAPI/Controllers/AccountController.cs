@@ -18,6 +18,7 @@ using Microsoft.Extensions.Primitives;
 using PMCommonApiModels.RequestModels;
 using PMCommonApiModels.ResponseModels;
 using PMCommonEntities.Models.PerformanceReporting;
+using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
 using Serilog;
 using TwelveDataSharp;
@@ -36,38 +37,37 @@ namespace PMUnifiedAPI.Controllers
     public class AccountController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string baseUrl = "";
-        private readonly IOptions<PseudoMarketsConfig> config;
-        private string _twelveDataApiKey = string.Empty;
         private readonly string _portfolioPerformanceApiBaseUrl;
         private readonly string _internalServiceAuthUsername;
         private readonly string _internalServiceAuthPassword;
+        private readonly UnifiedAuthService _unifiedAuth;
 
-        public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
+        public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, UnifiedAuthService authService)
         {
             _context = context;
-            config = appConfig;
-            baseUrl = config.Value.AppBaseUrl;
-            _twelveDataApiKey = _context.ApiKeys.Where(x => x.ProviderName == "TwelveData").Select(x => x.ApiKey)
-                .FirstOrDefault();
+            var config = appConfig;
             _portfolioPerformanceApiBaseUrl = config.Value.PerformanceReportingApiUrl;
             _internalServiceAuthUsername = config.Value.InternalServiceUsername;
             _internalServiceAuthPassword = config.Value.InternalServicePassword;
+            _unifiedAuth = authService;
         }
 
-        // POST: /api/Account/Positions
-        [HttpPost]
+        // GET: /api/Account/Positions
+        [HttpGet]
         [Route("Positions")]
-        public async Task<ActionResult> ViewPositions(ViewAccount input)
+        public async Task<ActionResult> ViewPositions()
         {
             try
             {
-                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+                var tokenStatus = authResult.Item3;
+
                 switch (tokenStatus)
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await GetAccountFromToken(input.Token);
+                        var account = authResult.Item2;
 
                         var positions = await _context.Positions.Where(x => x.AccountId == account.Id).ToListAsync();
                         return Ok(positions);
@@ -100,19 +100,22 @@ namespace PMUnifiedAPI.Controllers
             }
         }
 
-        // POST: /api/Account/Transactions
-        [HttpPost]
+        // GET: /api/Account/Transactions
+        [HttpGet]
         [Route("Transactions")]
-        public async Task<ActionResult> ViewTransactions(ViewAccount input)
+        public async Task<ActionResult> ViewTransactions()
         {
             try
             {
-                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+                var tokenStatus = authResult.Item3;
+                
                 switch (tokenStatus)
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await GetAccountFromToken(input.Token);
+                        var account = authResult.Item2;
 
                         var transactions = await _context.Transactions.Where(x => x.AccountId == account.Id).ToListAsync();
 
@@ -148,19 +151,22 @@ namespace PMUnifiedAPI.Controllers
             }
         }
 
-        // POST: /api/Balance
-        [HttpPost]
+        // GET: /api/Balance
+        [HttpGet]
         [Route("Balance")]
-        public async Task<ActionResult> ViewBalance(ViewAccount input)
+        public async Task<ActionResult> ViewBalance()
         {
             try
             {
-                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+                var tokenStatus = authResult.Item3;
+
                 switch (tokenStatus)
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await GetAccountFromToken(input.Token);
+                        var account = authResult.Item2;
 
                         AccountBalanceOutput output = new AccountBalanceOutput()
                         {
@@ -197,19 +203,22 @@ namespace PMUnifiedAPI.Controllers
             }
         }
 
-        // POST: /api/Account/PortfolioPerformance
-        [HttpPost]
+        // GET: /api/Account/PortfolioPerformance
+        [HttpGet]
         [Route("PortfolioPerformance/{date}")]
-        public async Task<ActionResult> ViewPortfolioPerformance([FromBody] ViewAccount input, string date)
+        public async Task<ActionResult> ViewPortfolioPerformance(string date)
         {
             try
             {
-                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+                var tokenStatus = authResult.Item3;
+
                 switch (tokenStatus)
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await GetAccountFromToken(input.Token);
+                        var account = authResult.Item2;
 
                         var accountId = account.Id;
 
@@ -255,19 +264,22 @@ namespace PMUnifiedAPI.Controllers
             }
         }
 
-        // POST: /api/Account/Summary
-        [HttpPost]
+        // GET: /api/Account/Summary
+        [HttpGet]
         [Route("Summary")]
-        public async Task<ActionResult> ViewSummary(ViewAccount input)
+        public async Task<ActionResult> ViewSummary()
         {
             try
             {
-                var tokenStatus = TokenHelper.ValidateToken(input.Token);
+                var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+                var tokenStatus = authResult.Item3;
+
                 switch (tokenStatus)
                 {
                     case TokenHelper.TokenStatus.Valid:
                     {
-                        var account = await GetAccountFromToken(input.Token);
+                        var account = authResult.Item2;
 
                         var accountId = account.Id;
 
@@ -312,15 +324,6 @@ namespace PMUnifiedAPI.Controllers
                 Log.Fatal(e, $"{nameof(ViewSummary)}");
                 return StatusCode(500);
             }
-        }
-
-        private async Task<Accounts> GetAccountFromToken(string token)
-        {
-            var account = await _context.Tokens.Where(x => x.Token == token).Join(_context.Accounts,
-                    tokens => tokens.UserID, accounts => accounts.UserID, (tokens, accounts) => accounts)
-                .FirstOrDefaultAsync();
-
-            return account;
         }
     }
 }

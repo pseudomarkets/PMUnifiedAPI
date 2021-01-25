@@ -17,6 +17,7 @@ using PMCommonApiModels.ResponseModels;
 using PMCommonEntities.Models;
 using PMUnifiedAPI.Models;
 using PMDataSynchronizer;
+using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
 using Serilog;
 using PseudoMarketsDbContext = PMUnifiedAPI.Models.PseudoMarketsDbContext;
@@ -35,20 +36,21 @@ namespace PMUnifiedAPI.Controllers
     public class TradeController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private string baseUrl = "";
-        private readonly IOptions<PseudoMarketsConfig> config;
-        private string SyncDbConnectionString = "";
-        private bool DataSyncEnabled = false;
-        private DateTimeHelper _dateTimeHelper;
+        private readonly string _baseUrl;
+        private readonly string _syncDbConnectionString;
+        private readonly bool _dataSyncEnabled = false;
+        private readonly DateTimeHelper _dateTimeHelper;
+        private readonly UnifiedAuthService _unifiedAuth;
 
-        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, DateTimeHelper dateTimeHelper)
+        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, DateTimeHelper dateTimeHelper, UnifiedAuthService unifiedAuth)
         {
             _context = context;
-            config = appConfig;
-            baseUrl = config.Value.AppBaseUrl;
-            SyncDbConnectionString = config.Value.DataSyncTargetDb;
-            DataSyncEnabled = config.Value.DataSyncEnabled;
+            var config = appConfig;
+            _baseUrl = config.Value.AppBaseUrl;
+            _syncDbConnectionString = config.Value.DataSyncTargetDb;
+            _dataSyncEnabled = config.Value.DataSyncEnabled;
             _dateTimeHelper = dateTimeHelper;
+            _unifiedAuth = unifiedAuth;
         }
 
         // POST: /api/Trade/Execute
@@ -56,7 +58,10 @@ namespace PMUnifiedAPI.Controllers
         [HttpPost]
         public async Task<ActionResult> ExecuteTrade([FromBody] TradeExecInput input)
         {
-            var tokenStatus = TokenHelper.ValidateToken(input.Token);
+            var authResult = await _unifiedAuth.AuthenticateUser(Request.HttpContext);
+
+            var tokenStatus = authResult.Item3;
+
             switch (tokenStatus)
             {
                 case TokenHelper.TokenStatus.Valid:
@@ -64,12 +69,13 @@ namespace PMUnifiedAPI.Controllers
                     try
                     {
                         var transactionId = Guid.NewGuid().ToString();
-                        var userId = await _context.Tokens.Where(x => x.Token == input.Token).Select(x => x.UserID).FirstOrDefaultAsync();
-                        var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-                        var account = await _context.Accounts.FirstOrDefaultAsync(x => x.UserID == user.Id);
+                        
+                        var account = authResult.Item2;
+
+                        var user = authResult.Item1;
 
                         var client = new HttpClient();
-                        var response = await client.GetAsync(baseUrl + "/api/Quotes/SmartQuote/" + input.Symbol);
+                        var response = await client.GetAsync(_baseUrl + "/api/Quotes/SmartQuote/" + input.Symbol);
                         string jsonResponse = await response.Content.ReadAsStringAsync();
                         var jsonObj = JsonConvert.DeserializeObject<LatestPriceOutput>(jsonResponse);
                         double price = jsonObj.price;
@@ -78,7 +84,7 @@ namespace PMUnifiedAPI.Controllers
 
                         TradeExecOutput output = new TradeExecOutput();
 
-                        DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
+                        DataSyncManager dataSyncManager = new DataSyncManager(_syncDbConnectionString);
 
                         // TODO: Extract trade logic into a separate static class
                         if (hasSufficientBalance)
@@ -87,7 +93,7 @@ namespace PMUnifiedAPI.Controllers
                             {
                                 if (price > 0 && input.Quantity > 0)
                                 {
-                                    if (_dateTimeHelper.IsMarketOpen() && !_dateTimeHelper.IsMarketHoliday())
+                                    if (_dateTimeHelper.IsMarketOpen())
                                     {
                                             Orders order = new Orders()
                                             {
@@ -109,7 +115,7 @@ namespace PMUnifiedAPI.Controllers
                                             _context.Transactions.Add(transaction);
                                             await _context.SaveChangesAsync();
 
-                                            if (DataSyncEnabled)
+                                            if (_dataSyncEnabled)
                                             {
                                                 Orders replicatedOrder = new Orders()
                                                 {
@@ -150,7 +156,7 @@ namespace PMUnifiedAPI.Controllers
                                                         _context.Entry(account).State = EntityState.Modified;
                                                         await _context.SaveChangesAsync();
 
-                                                        if (DataSyncEnabled)
+                                                        if (_dataSyncEnabled)
                                                         {
 
                                                             await dataSyncManager.SyncPositions(existingPosition, user,
@@ -170,7 +176,7 @@ namespace PMUnifiedAPI.Controllers
                                                             _context.Entry(existingPosition).State = EntityState.Deleted;
                                                             await _context.SaveChangesAsync();
 
-                                                            if (DataSyncEnabled)
+                                                            if (_dataSyncEnabled)
                                                             {
                                                                 await dataSyncManager.SyncAccounts(account, user,
                                                                     DataSyncManager.DbSyncMethod.Update);
@@ -187,7 +193,7 @@ namespace PMUnifiedAPI.Controllers
                                                             _context.Entry(account).State = EntityState.Modified;
                                                             await _context.SaveChangesAsync();
 
-                                                            if (DataSyncEnabled)
+                                                            if (_dataSyncEnabled)
                                                             {
 
                                                                 await dataSyncManager.SyncAccounts(account, user,
@@ -216,7 +222,7 @@ namespace PMUnifiedAPI.Controllers
                                                     _context.Entry(account).State = EntityState.Modified;
                                                     await _context.SaveChangesAsync();
 
-                                                    if (DataSyncEnabled)
+                                                    if (_dataSyncEnabled)
                                                     {
                                                         Positions replicatedPosition = new Positions()
                                                         {
@@ -247,7 +253,7 @@ namespace PMUnifiedAPI.Controllers
                                                         _context.Entry(account).State = EntityState.Modified;
                                                         await _context.SaveChangesAsync();
 
-                                                        if (DataSyncEnabled)
+                                                        if (_dataSyncEnabled)
                                                         {
                                                             await dataSyncManager.SyncAccounts(account, user,
                                                                 DataSyncManager.DbSyncMethod.Update);
@@ -264,7 +270,7 @@ namespace PMUnifiedAPI.Controllers
                                                         _context.Entry(account).State = EntityState.Modified;
                                                         await _context.SaveChangesAsync();
 
-                                                        if (DataSyncEnabled)
+                                                        if (_dataSyncEnabled)
                                                         {
                                                             await dataSyncManager.SyncAccounts(account, user,
                                                                 DataSyncManager.DbSyncMethod.Update);
@@ -276,6 +282,8 @@ namespace PMUnifiedAPI.Controllers
                                                 else
                                                 {
                                                     output.StatusCode = TradeStatusCodes.ExecutionError;
+                                                    output.StatusMessage =
+                                                        StatusMessages.InvalidPositionsMessage + input.Symbol;
                                                     return Ok(output);
                                                 }
                                             }
@@ -292,12 +300,14 @@ namespace PMUnifiedAPI.Controllers
                                                     {
                                                         _context.Entry(createdOrder).State = EntityState.Deleted;
                                                         await _context.SaveChangesAsync();
-                                                        if (DataSyncEnabled)
+                                                        if (_dataSyncEnabled)
                                                         {
                                                             await dataSyncManager.SyncOrders(createdOrder, user, DataSyncManager.DbSyncMethod.Delete);
                                                         }
 
                                                         output.StatusCode = TradeStatusCodes.ExecutionError;
+                                                        output.StatusMessage =
+                                                            StatusMessages.InvalidShortPositionMessage;
                                                         return Ok(output);
                                                     }
                                                     else
@@ -307,7 +317,7 @@ namespace PMUnifiedAPI.Controllers
                                                         _context.Entry(existingPosition).State = EntityState.Modified;
                                                         await _context.SaveChangesAsync();
 
-                                                        if (DataSyncEnabled)
+                                                        if (_dataSyncEnabled)
                                                         {
                                                             await dataSyncManager.SyncAccounts(account, user,
                                                                 DataSyncManager.DbSyncMethod.Update);
@@ -332,7 +342,7 @@ namespace PMUnifiedAPI.Controllers
                                                     _context.Entry(account).State = EntityState.Modified;
                                                     await _context.SaveChangesAsync();
 
-                                                    if (DataSyncEnabled)
+                                                    if (_dataSyncEnabled)
                                                     {
                                                         await dataSyncManager.SyncPositions(position, user,
                                                             DataSyncManager.DbSyncMethod.Insert);
@@ -342,12 +352,15 @@ namespace PMUnifiedAPI.Controllers
                                             }
 
                                             output.StatusCode = TradeStatusCodes.ExecutionOk;
+                                            output.StatusMessage = StatusMessages.SuccessMessage;
                                             output.Order = createdOrder;
                                             return Ok(output);
                                     }
                                     else
                                     {
-                                        CreateQueuedOrder(input, userId);
+                                        CreateQueuedOrder(input, user.Id);
+                                        output.StatusMessage =
+                                            "Market is closed, order has been queued to be filled on next market open";
                                         output.StatusCode = TradeStatusCodes.ExecutionQueued;
                                         return Ok(output);
                                     }
@@ -355,27 +368,32 @@ namespace PMUnifiedAPI.Controllers
                                 else
                                 {
                                     output.StatusCode = TradeStatusCodes.ExecutionError;
+                                    output.StatusMessage = StatusMessages.InvalidSymbolOrQuantityMessage;
                                     return Ok(output);
                                 }
                             }
                             else
                             {
                                 output.StatusCode = TradeStatusCodes.ExecutionError;
+                                output.StatusMessage = StatusMessages.InvalidOrderTypeMessage;
                                 return Ok(output);
                             }
                         }
                         else
                         {
                             output.StatusCode = TradeStatusCodes.ExecutionError;
+                            output.StatusMessage = StatusMessages.InsufficientBalanceMessage;
                             return Ok(output);
                         }
 
                     }
                     catch (Exception e)
                     {
-                        StatusOutput status = new StatusOutput()
+                        TradeExecOutput status = new TradeExecOutput()
                         {
-                            message = "An internal error occured, please try again later."
+                            Order = null,
+                            StatusCode = TradeStatusCodes.ExecutionError,
+                            StatusMessage = StatusMessages.FailureMessage
                         };
                         Log.Fatal(e, $"{nameof(ExecuteTrade)}");
                         return Ok(status);
@@ -383,18 +401,22 @@ namespace PMUnifiedAPI.Controllers
                 }
                 case TokenHelper.TokenStatus.Expired:
                 {
-                    StatusOutput status = new StatusOutput()
+                    TradeExecOutput status = new TradeExecOutput()
                     {
-                        message = StatusMessages.ExpiredTokenMessage
+                        Order = null,
+                        StatusCode = TradeStatusCodes.ExecutionError,
+                        StatusMessage = StatusMessages.ExpiredTokenMessage
                     };
 
                     return Ok(status);
                 }
                 default:
                 {
-                    StatusOutput status = new StatusOutput()
+                    TradeExecOutput status = new TradeExecOutput()
                     {
-                        message = StatusMessages.InvalidTokenMessage
+                        Order = null,
+                        StatusCode = TradeStatusCodes.ExecutionError,
+                        StatusMessage = StatusMessages.InvalidTokenMessage
                     };
 
                     return Ok(status);

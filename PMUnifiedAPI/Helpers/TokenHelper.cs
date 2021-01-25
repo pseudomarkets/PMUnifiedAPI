@@ -21,9 +21,9 @@ namespace PMUnifiedAPI.Helpers
 {
     public class TokenHelper
     {
-        private static string secret = Startup.Configuration.GetValue<string>("PMConfig:TokenSecretKey");
-        private static string issuer = Startup.Configuration.GetValue<string>("PMConfig:TokenIssuer");
-        private static string source = Startup.Configuration.GetValue<string>("PMConfig:ServerId");
+        private static readonly string Secret = Startup.Configuration.GetValue<string>("PMConfig:TokenSecretKey");
+        private static readonly string Issuer = Startup.Configuration.GetValue<string>("PMConfig:TokenIssuer");
+        private static readonly string Source = Startup.Configuration.GetValue<string>("PMConfig:ServerId");
 
         public static TokenStatus ValidateToken(string token)
         {
@@ -36,14 +36,14 @@ namespace PMUnifiedAPI.Helpers
                 IBase64UrlEncoder urlEncoder = new JwtBase64UrlEncoder();
                 IJwtDecoder decoder = new JwtDecoder(serializer, validator, urlEncoder, new HMACSHA256Algorithm());
 
-                var jsonString = decoder.Decode(token, secret, verify: true);
+                var jsonString = decoder.Decode(token, Secret, verify: true);
 
                 var json = JsonConvert.DeserializeObject<TokenJson>(jsonString);
 
                 if (json != null)
                 {
                     // Standard tokens are valid for 1 hour, special tokens have no expiration
-                    if (json.iss == issuer && json.src == source && (DateTime.Now <= json.ts.AddHours(1) || json.typ == TokenType.Special))
+                    if (json.iss == Issuer && json.src == Source && (DateTime.Now <= json.ts.AddHours(1) || json.typ == TokenType.Special))
                     {
                         status = TokenStatus.Valid;
                     }
@@ -69,11 +69,11 @@ namespace PMUnifiedAPI.Helpers
         {
             var token = new JwtBuilder()
                 .WithAlgorithm(new HMACSHA256Algorithm())
-                .WithSecret(secret)
+                .WithSecret(Secret)
                 .AddClaim("sub", username)
                 .AddClaim("typ", type)
-                .AddClaim("iss", issuer)
-                .AddClaim("src", source)
+                .AddClaim("iss", Issuer)
+                .AddClaim("src", Source)
                 .AddClaim("ts", DateTime.Now)
                 .Encode();
             return token;

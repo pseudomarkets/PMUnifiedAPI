@@ -30,16 +30,15 @@ namespace PMUnifiedAPI.Controllers
     public class UsersController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private readonly IOptions<PseudoMarketsConfig> config;
-        private bool DataSyncEnabled = false;
-        private string SyncDbConnectionString = "";
+        private readonly bool _dataSyncEnabled = false;
+        private readonly string _syncDbConnectionString;
 
         public UsersController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig)
         {
             _context = context;
-            config = appConfig;
-            DataSyncEnabled = config.Value.DataSyncEnabled;
-            SyncDbConnectionString = config.Value.DataSyncTargetDb;
+            var config = appConfig;
+            _dataSyncEnabled = config.Value.DataSyncEnabled;
+            _syncDbConnectionString = config.Value.DataSyncTargetDb;
         }
 
         // POST: api/Users/Register
@@ -51,7 +50,7 @@ namespace PMUnifiedAPI.Controllers
             {
                 if (!_context.Users.Any(x => x.Username == input.username))
                 {
-                    DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
+                    DataSyncManager dataSyncManager = new DataSyncManager(_syncDbConnectionString);
 
                     byte[] salt = new byte[128 / 8];
                     using (var rng = RandomNumberGenerator.Create())
@@ -84,7 +83,7 @@ namespace PMUnifiedAPI.Controllers
                     _context.Accounts.Add(newAccount);
                     await _context.SaveChangesAsync();
 
-                    if (DataSyncEnabled)
+                    if (_dataSyncEnabled)
                     {
                         Users replicatedUser = new Users()
                         {
@@ -175,7 +174,7 @@ namespace PMUnifiedAPI.Controllers
                 var exists = _context.Users.Any(x => x.Username == input.username);
                 if (exists)
                 {
-                    DataSyncManager dataSyncManager = new DataSyncManager(SyncDbConnectionString);
+                    DataSyncManager dataSyncManager = new DataSyncManager(_syncDbConnectionString);
                     var user = await _context.Users.Where(x => x.Username == input.username).FirstOrDefaultAsync();
 
                     if (PasswordHashHelper.GetHash(input.old_password, user.Salt) == user.Password)
@@ -190,7 +189,7 @@ namespace PMUnifiedAPI.Controllers
 
                         await _context.SaveChangesAsync();
 
-                        if (DataSyncEnabled)
+                        if (_dataSyncEnabled)
                         {
                             await dataSyncManager.SyncUsers(user, DataSyncManager.DbSyncMethod.Update);
                             await dataSyncManager.SyncTokens(token, user, DataSyncManager.DbSyncMethod.Update);

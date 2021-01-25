@@ -32,7 +32,7 @@ namespace PMUnifiedAPI.Helpers
                 new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 30, 0).ToUniversalTime() &&
                 DateTime.Now.ToUniversalTime() <=
                 new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 15, 0, 0).ToUniversalTime() &&
-                (DateTime.Now.DayOfWeek != DayOfWeek.Saturday || DateTime.Now.DayOfWeek != DayOfWeek.Sunday))
+                (DateTime.Now.DayOfWeek != DayOfWeek.Saturday || DateTime.Now.DayOfWeek != DayOfWeek.Sunday) && !IsMarketHoliday())
             {
                 return true;
             }

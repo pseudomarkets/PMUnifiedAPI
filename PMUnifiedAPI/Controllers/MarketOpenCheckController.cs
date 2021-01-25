@@ -23,7 +23,7 @@ namespace PMUnifiedAPI.Controllers
     [ApiController]
     public class MarketOpenCheckController : ControllerBase
     {
-        private DateTimeHelper _dateTimeHelper;
+        private readonly DateTimeHelper _dateTimeHelper;
         public MarketOpenCheckController(DateTimeHelper dateTimeHelper)
         {
             _dateTimeHelper = dateTimeHelper;
@@ -34,7 +34,7 @@ namespace PMUnifiedAPI.Controllers
         public ActionResult Get()
         {
             MarketStatusOutput output = new MarketStatusOutput();
-            if (_dateTimeHelper.IsMarketOpen() && !_dateTimeHelper.IsMarketHoliday())
+            if (_dateTimeHelper.IsMarketOpen())
             {
                 output.MarketStatus = StatusMessages.MarketIsOpenMessage;
             }
