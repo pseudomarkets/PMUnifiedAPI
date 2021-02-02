@@ -41,8 +41,10 @@ namespace PMUnifiedAPI.Controllers
         private readonly string _internalServiceAuthUsername;
         private readonly string _internalServiceAuthPassword;
         private readonly UnifiedAuthService _unifiedAuth;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly HttpClient _httpClient;
 
-        public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, UnifiedAuthService authService)
+        public AccountController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, UnifiedAuthService authService, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             var config = appConfig;
@@ -50,6 +52,9 @@ namespace PMUnifiedAPI.Controllers
             _internalServiceAuthUsername = config.Value.InternalServiceUsername;
             _internalServiceAuthPassword = config.Value.InternalServicePassword;
             _unifiedAuth = authService;
+            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+            _httpClient = _httpClientFactory.CreateClient();
+            _httpClient.BaseAddress = new Uri(_portfolioPerformanceApiBaseUrl);
         }
 
         // GET: /api/Account/Positions
@@ -222,16 +227,10 @@ namespace PMUnifiedAPI.Controllers
 
                         var accountId = account.Id;
 
-                        HttpClient client = new HttpClient()
-                        {
-                            BaseAddress = new Uri(_portfolioPerformanceApiBaseUrl)
-                        };
-
-
                         var byteArray = Encoding.ASCII.GetBytes($"{_internalServiceAuthUsername}:{_internalServiceAuthPassword}");
-                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
+                        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
 
-                        var response = await client.GetStringAsync($"PerformanceReport/GetPerformanceReport/{accountId}/{date}");
+                        var response = await _httpClient.GetStringAsync($"PerformanceReport/GetPerformanceReport/{accountId}/{date}");
 
                         var responseJson = JsonConvert.DeserializeObject<PortfolioPerformanceReport>(response);
 

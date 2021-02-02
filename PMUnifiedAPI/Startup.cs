@@ -34,16 +34,26 @@ namespace PMUnifiedAPI
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // Add Relational Data Store context
             services.AddDbContext<PseudoMarketsDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("PMDB")));
+
+            // Setup configuration from appsettings.json
             services.Configure<PseudoMarketsConfig>(Configuration.GetSection("PMConfig"));
-            // Inject DateTimeHelper for market open check and Unified Auth Service for shared authentication mechanism
+
+            // Inject DateTimeHelper for market open check
             services.AddScoped<DateTimeHelper>();
+
+            // Inject Unified Auth Service for shared authentication mechanism 
             services.AddScoped<UnifiedAuthService>();
+
             // Inject Market Data Service Provider
             services.AddSingleton<MarketDataServiceClient>(new MarketDataServiceClient(new HttpClient(),
                 Configuration.GetValue<string>("PMConfig:InternalServiceUsername"),
                 Configuration.GetValue<string>("PMConfig:InternalServicePassword"),
                 Configuration.GetValue<string>("PMConfig:MarketDataServiceUrl")));
+
+            // Add all other services
+            services.AddHttpClient();
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
