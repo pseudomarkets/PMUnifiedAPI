@@ -57,7 +57,7 @@ namespace PMUnifiedAPI.Helpers
             {
                 status = TokenStatus.Expired;
             }
-            catch (SignatureVerificationException)
+            catch (Exception ex)
             {
                 status = TokenStatus.Unknown;
             }

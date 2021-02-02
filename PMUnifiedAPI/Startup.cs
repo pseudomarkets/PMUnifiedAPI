@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using PMUnifiedAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using PMMarketDataService.DataProvider.Client.Implementation;
 using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
 using PMUnifiedAPI.Interfaces;
@@ -37,6 +39,11 @@ namespace PMUnifiedAPI
             // Inject DateTimeHelper for market open check and Unified Auth Service for shared authentication mechanism
             services.AddScoped<DateTimeHelper>();
             services.AddScoped<UnifiedAuthService>();
+            // Inject Market Data Service Provider
+            services.AddSingleton<MarketDataServiceClient>(new MarketDataServiceClient(new HttpClient(),
+                Configuration.GetValue<string>("PMConfig:InternalServiceUsername"),
+                Configuration.GetValue<string>("PMConfig:InternalServicePassword"),
+                Configuration.GetValue<string>("PMConfig:MarketDataServiceUrl")));
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {

@@ -17,6 +17,7 @@ using PMCommonApiModels.ResponseModels;
 using PMCommonEntities.Models;
 using PMUnifiedAPI.Models;
 using PMDataSynchronizer;
+using PMMarketDataService.DataProvider.Client.Implementation;
 using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
 using Serilog;
@@ -36,21 +37,21 @@ namespace PMUnifiedAPI.Controllers
     public class TradeController : ControllerBase
     {
         private readonly PseudoMarketsDbContext _context;
-        private readonly string _baseUrl;
         private readonly string _syncDbConnectionString;
         private readonly bool _dataSyncEnabled = false;
         private readonly DateTimeHelper _dateTimeHelper;
         private readonly UnifiedAuthService _unifiedAuth;
+        private readonly MarketDataServiceClient _marketDataService;
 
-        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, DateTimeHelper dateTimeHelper, UnifiedAuthService unifiedAuth)
+        public TradeController(PseudoMarketsDbContext context, IOptions<PseudoMarketsConfig> appConfig, DateTimeHelper dateTimeHelper, UnifiedAuthService unifiedAuth, MarketDataServiceClient marketDataService)
         {
             _context = context;
             var config = appConfig;
-            _baseUrl = config.Value.AppBaseUrl;
             _syncDbConnectionString = config.Value.DataSyncTargetDb;
             _dataSyncEnabled = config.Value.DataSyncEnabled;
             _dateTimeHelper = dateTimeHelper;
             _unifiedAuth = unifiedAuth;
+            _marketDataService = marketDataService;
         }
 
         // POST: /api/Trade/Execute
@@ -74,11 +75,9 @@ namespace PMUnifiedAPI.Controllers
 
                         var user = authResult.Item1;
 
-                        var client = new HttpClient();
-                        var response = await client.GetAsync(_baseUrl + "/api/Quotes/SmartQuote/" + input.Symbol);
-                        string jsonResponse = await response.Content.ReadAsStringAsync();
-                        var jsonObj = JsonConvert.DeserializeObject<LatestPriceOutput>(jsonResponse);
-                        double price = jsonObj.price;
+                        var latestPrice = await _marketDataService.GetLatestPrice(input.Symbol);
+                        double price = latestPrice.price;
+
                         double value = price * input.Quantity;
                         bool hasSufficientBalance = account.Balance >= value;
 

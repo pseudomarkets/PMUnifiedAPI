@@ -29,5 +29,6 @@ namespace PMUnifiedAPI.Models
         public string PerformanceReportingApiUrl { get; set; }
         public string InternalServiceUsername { get; set; }
         public string InternalServicePassword { get; set; }
+        public string MarketDataServiceUrl { get; set; }
     }
 }

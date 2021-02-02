@@ -33,11 +33,19 @@ namespace PMUnifiedAPI.AuthenticationService
 
             var tokenStatus = TokenHelper.ValidateToken(authHeader);
 
-            var account = await GetAccountFromToken(authHeader);
+            if (tokenStatus == TokenHelper.TokenStatus.Valid)
+            {
+                var account = await GetAccountFromToken(authHeader);
 
-            var user = await GetUserFromToken(authHeader);
+                var user = await GetUserFromToken(authHeader);
 
-            return new Tuple<Users, Accounts, TokenHelper.TokenStatus>(user, account, tokenStatus);
+                return new Tuple<Users, Accounts, TokenHelper.TokenStatus>(user, account, tokenStatus);
+            }
+            else
+            {
+                return new Tuple<Users, Accounts, TokenHelper.TokenStatus>(null, null, TokenHelper.TokenStatus.Unknown);
+            }
+
         }
 
         private async Task<Accounts> GetAccountFromToken(string token)
