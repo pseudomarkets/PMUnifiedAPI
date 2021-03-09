@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PMCommonApiModels.RequestModels;
 using PMCommonApiModels.ResponseModels;
+using PMCommonEntities.Models;
 using PMDataSynchronizer;
 using PMUnifiedAPI.Helpers;
 using PMUnifiedAPI.Models;
@@ -62,7 +63,8 @@ namespace PMUnifiedAPI.Controllers
                     {
                         Username = input.username,
                         Password = PasswordHashHelper.GetHash(input.password, salt),
-                        Salt = salt
+                        Salt = salt,
+                        EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary
                     };
 
                     _context.Users.Add(newUser);
@@ -72,13 +74,17 @@ namespace PMUnifiedAPI.Controllers
                     Tokens newToken = new Tokens()
                     {
                         UserID = createdUser.Id,
-                        Token = TokenHelper.GenerateToken(input.username, TokenHelper.TokenType.Standard)
+                        Token = TokenHelper.GenerateToken(input.username, TokenHelper.TokenType.Standard),
+                        EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary
                     };
+
                     Accounts newAccount = new Accounts()
                     {
                         UserID = createdUser.Id,
-                        Balance = 1000000.99
+                        Balance = 1000000.99,
+                        EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary
                     };
+
                     _context.Tokens.Add(newToken);
                     _context.Accounts.Add(newAccount);
                     await _context.SaveChangesAsync();
@@ -89,7 +95,8 @@ namespace PMUnifiedAPI.Controllers
                         {
                             Username = newUser.Username,
                             Password = newUser.Password,
-                            Salt = newUser.Salt
+                            Salt = newUser.Salt,
+                            EnvironmentId = RDSEnums.EnvironmentId.ProductionSecondary
                         };
 
                         await dataSyncManager.SyncNewUser(replicatedUser, newToken.Token);
@@ -135,6 +142,10 @@ namespace PMUnifiedAPI.Controllers
                         var token = _context.Tokens.FirstOrDefault(x => x.UserID == user.Id);
 
                         // Create a new token on every successful login
+
+                        if (token == null)
+                            return default;
+
                         token.Token = TokenHelper.GenerateToken(user.Username, TokenHelper.TokenType.Standard);
                         _context.Entry(token).State = EntityState.Modified;
 

@@ -1,25 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.CodeAnalysis.CodeFixes;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Update;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using PMCommonApiModels.RequestModels;
 using PMCommonApiModels.ResponseModels;
 using PMCommonEntities.Models;
-using PMUnifiedAPI.Models;
 using PMDataSynchronizer;
 using PMMarketDataService.DataProvider.Client.Implementation;
 using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
+using PMUnifiedAPI.Models;
 using Serilog;
 using PseudoMarketsDbContext = PMUnifiedAPI.Models.PseudoMarketsDbContext;
 
@@ -38,7 +30,7 @@ namespace PMUnifiedAPI.Controllers
     {
         private readonly PseudoMarketsDbContext _context;
         private readonly string _syncDbConnectionString;
-        private readonly bool _dataSyncEnabled = false;
+        private readonly bool _dataSyncEnabled;
         private readonly DateTimeHelper _dateTimeHelper;
         private readonly UnifiedAuthService _unifiedAuth;
         private readonly MarketDataServiceClient _marketDataService;
@@ -94,20 +86,25 @@ namespace PMUnifiedAPI.Controllers
                                 {
                                     if (_dateTimeHelper.IsMarketOpen())
                                     {
-                                            Orders order = new Orders()
+                                            Orders order = new Orders
                                             {
                                                 Symbol = input.Symbol,
                                                 Type = input.Type,
                                                 Price = price,
                                                 Quantity = input.Quantity,
                                                 Date = DateTime.Now,
-                                                TransactionID = transactionId
+                                                TransactionID = transactionId,
+                                                EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary,
+                                                OriginId = RDSEnums.OriginId.PseudoMarkets,
+                                                SecurityTypeId = RDSEnums.SecurityType.RealWorld
                                             };
 
-                                            Transactions transaction = new Transactions()
+                                            Transactions transaction = new Transactions
                                             {
                                                 AccountId = account.Id,
-                                                TransactionId = transactionId
+                                                TransactionId = transactionId,
+                                                EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary,
+                                                OriginId = RDSEnums.OriginId.PseudoMarkets
                                             };
 
                                             _context.Orders.Add(order);
@@ -116,19 +113,24 @@ namespace PMUnifiedAPI.Controllers
 
                                             if (_dataSyncEnabled)
                                             {
-                                                Orders replicatedOrder = new Orders()
+                                                Orders replicatedOrder = new Orders
                                                 {
                                                     Symbol = order.Symbol,
                                                     Type = order.Type,
                                                     Price = order.Price,
                                                     Quantity = order.Quantity,
                                                     TransactionID = order.TransactionID,
-                                                    Date = DateTime.Now
+                                                    Date = DateTime.Now,
+                                                    EnvironmentId = RDSEnums.EnvironmentId.ProductionSecondary,
+                                                    OriginId = RDSEnums.OriginId.PseudoMarkets,
+                                                    SecurityTypeId = RDSEnums.SecurityType.RealWorld
                                                 };
 
-                                                Transactions replicatedTransaction = new Transactions()
+                                                Transactions replicatedTransaction = new Transactions
                                                 {
-                                                    TransactionId = order.TransactionID
+                                                    TransactionId = order.TransactionID,
+                                                    EnvironmentId = RDSEnums.EnvironmentId.ProductionSecondary,
+                                                    OriginId = RDSEnums.OriginId.PseudoMarkets
                                                 };
 
                                                 await dataSyncManager.SyncOrders(replicatedOrder, user, DataSyncManager.DbSyncMethod.Insert);
@@ -141,7 +143,7 @@ namespace PMUnifiedAPI.Controllers
                                             {
                                                 var doesAccountHaveExistingPosition =
                                                     _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                                if (doesAccountHaveExistingPosition == true)
+                                                if (doesAccountHaveExistingPosition)
                                                 {
                                                     var existingPosition = await _context.Positions
                                                         .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
@@ -157,11 +159,9 @@ namespace PMUnifiedAPI.Controllers
 
                                                         if (_dataSyncEnabled)
                                                         {
-
                                                             await dataSyncManager.SyncPositions(existingPosition, user,
                                                                 DataSyncManager.DbSyncMethod.Update);
                                                             await dataSyncManager.SyncAccounts(account, user, DataSyncManager.DbSyncMethod.Update);
-
                                                         }
 
                                                     }
@@ -206,13 +206,16 @@ namespace PMUnifiedAPI.Controllers
                                                 }
                                                 else
                                                 {
-                                                    Positions position = new Positions()
+                                                    Positions position = new Positions
                                                     {
                                                         AccountId = account.Id,
                                                         OrderId = createdOrder.Id,
                                                         Value = value,
                                                         Symbol = input.Symbol,
-                                                        Quantity = input.Quantity
+                                                        Quantity = input.Quantity,
+                                                        EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary,
+                                                        OriginId = RDSEnums.OriginId.PseudoMarkets,
+                                                        SecurityTypeId = RDSEnums.SecurityType.RealWorld
                                                     };
                                                     _context.Positions.Add(position);
                                                     await _context.SaveChangesAsync();
@@ -223,12 +226,15 @@ namespace PMUnifiedAPI.Controllers
 
                                                     if (_dataSyncEnabled)
                                                     {
-                                                        Positions replicatedPosition = new Positions()
+                                                        Positions replicatedPosition = new Positions
                                                         {
                                                             OrderId = createdOrder.Id,
                                                             Value = value,
                                                             Symbol = input.Symbol,
-                                                            Quantity = input.Quantity
+                                                            Quantity = input.Quantity,
+                                                            EnvironmentId = RDSEnums.EnvironmentId.ProductionSecondary,
+                                                            OriginId = RDSEnums.OriginId.PseudoMarkets,
+                                                            SecurityTypeId = RDSEnums.SecurityType.RealWorld
                                                         };
 
                                                         await dataSyncManager.SyncPositions(replicatedPosition, user,
@@ -241,7 +247,7 @@ namespace PMUnifiedAPI.Controllers
                                             {
                                                 var doesAccountHaveExistingPosition =
                                                     _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                                if (doesAccountHaveExistingPosition == true)
+                                                if (doesAccountHaveExistingPosition)
                                                 {
                                                     var existingPosition = await _context.Positions
                                                         .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol).FirstOrDefaultAsync();
@@ -290,7 +296,7 @@ namespace PMUnifiedAPI.Controllers
                                             {
                                                 var doesAccountHaveExistingPosition =
                                                     _context.Positions.Any(x => x.AccountId == account.Id && x.Symbol == input.Symbol);
-                                                if (doesAccountHaveExistingPosition == true)
+                                                if (doesAccountHaveExistingPosition)
                                                 {
                                                     var existingPosition = await _context.Positions
                                                         .Where(x => x.AccountId == account.Id && x.Symbol == input.Symbol)
@@ -309,31 +315,32 @@ namespace PMUnifiedAPI.Controllers
                                                             StatusMessages.InvalidShortPositionMessage;
                                                         return Ok(output);
                                                     }
-                                                    else
-                                                    {
-                                                        existingPosition.Value += value;
-                                                        existingPosition.Quantity += input.Quantity * -1;
-                                                        _context.Entry(existingPosition).State = EntityState.Modified;
-                                                        await _context.SaveChangesAsync();
 
-                                                        if (_dataSyncEnabled)
-                                                        {
-                                                            await dataSyncManager.SyncAccounts(account, user,
-                                                                DataSyncManager.DbSyncMethod.Update);
-                                                            await dataSyncManager.SyncPositions(existingPosition, user,
-                                                                DataSyncManager.DbSyncMethod.Update);
-                                                        }
+                                                    existingPosition.Value += value;
+                                                    existingPosition.Quantity += input.Quantity * -1;
+                                                    _context.Entry(existingPosition).State = EntityState.Modified;
+                                                    await _context.SaveChangesAsync();
+
+                                                    if (_dataSyncEnabled)
+                                                    {
+                                                        await dataSyncManager.SyncAccounts(account, user,
+                                                            DataSyncManager.DbSyncMethod.Update);
+                                                        await dataSyncManager.SyncPositions(existingPosition, user,
+                                                            DataSyncManager.DbSyncMethod.Update);
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    Positions position = new Positions()
+                                                    Positions position = new Positions
                                                     {
                                                         AccountId = account.Id,
                                                         OrderId = createdOrder.Id,
                                                         Value = value,
                                                         Symbol = input.Symbol,
-                                                        Quantity = input.Quantity * -1
+                                                        Quantity = input.Quantity * -1,
+                                                        EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary,
+                                                        OriginId = RDSEnums.OriginId.PseudoMarkets,
+                                                        SecurityTypeId = RDSEnums.SecurityType.RealWorld
                                                     };
 
                                                     _context.Positions.Add(position);
@@ -355,40 +362,31 @@ namespace PMUnifiedAPI.Controllers
                                             output.Order = createdOrder;
                                             return Ok(output);
                                     }
-                                    else
-                                    {
-                                        CreateQueuedOrder(input, user.Id);
-                                        output.StatusMessage =
-                                            "Market is closed, order has been queued to be filled on next market open";
-                                        output.StatusCode = TradeStatusCodes.ExecutionQueued;
-                                        return Ok(output);
-                                    }
-                                }
-                                else
-                                {
-                                    output.StatusCode = TradeStatusCodes.ExecutionError;
-                                    output.StatusMessage = StatusMessages.InvalidSymbolOrQuantityMessage;
+
+                                    CreateQueuedOrder(input, user.Id);
+                                    output.StatusMessage =
+                                        "Market is closed, order has been queued to be filled on next market open";
+                                    output.StatusCode = TradeStatusCodes.ExecutionQueued;
                                     return Ok(output);
                                 }
-                            }
-                            else
-                            {
+
                                 output.StatusCode = TradeStatusCodes.ExecutionError;
-                                output.StatusMessage = StatusMessages.InvalidOrderTypeMessage;
+                                output.StatusMessage = StatusMessages.InvalidSymbolOrQuantityMessage;
                                 return Ok(output);
                             }
-                        }
-                        else
-                        {
+
                             output.StatusCode = TradeStatusCodes.ExecutionError;
-                            output.StatusMessage = StatusMessages.InsufficientBalanceMessage;
+                            output.StatusMessage = StatusMessages.InvalidOrderTypeMessage;
                             return Ok(output);
                         }
 
+                        output.StatusCode = TradeStatusCodes.ExecutionError;
+                        output.StatusMessage = StatusMessages.InsufficientBalanceMessage;
+                        return Ok(output);
                     }
                     catch (Exception e)
                     {
-                        TradeExecOutput status = new TradeExecOutput()
+                        TradeExecOutput status = new TradeExecOutput
                         {
                             Order = null,
                             StatusCode = TradeStatusCodes.ExecutionError,
@@ -400,7 +398,7 @@ namespace PMUnifiedAPI.Controllers
                 }
                 case TokenHelper.TokenStatus.Expired:
                 {
-                    TradeExecOutput status = new TradeExecOutput()
+                    TradeExecOutput status = new TradeExecOutput
                     {
                         Order = null,
                         StatusCode = TradeStatusCodes.ExecutionError,
@@ -411,7 +409,7 @@ namespace PMUnifiedAPI.Controllers
                 }
                 default:
                 {
-                    TradeExecOutput status = new TradeExecOutput()
+                    TradeExecOutput status = new TradeExecOutput
                     {
                         Order = null,
                         StatusCode = TradeStatusCodes.ExecutionError,
@@ -427,14 +425,15 @@ namespace PMUnifiedAPI.Controllers
         {
             try
             {
-                QueuedOrders order = new QueuedOrders()
+                QueuedOrders order = new QueuedOrders
                 {
                     OrderDate = DateTime.Today,
                     OrderType = input.Type,
                     Quantity = input.Quantity,
                     Symbol = input.Symbol,
                     UserId = userId,
-                    IsOpenOrder = true
+                    IsOpenOrder = true,
+                    EnvironmentId = RDSEnums.EnvironmentId.ProductionPrimary
                 };
 
                 _context.QueuedOrders.Add(order);
