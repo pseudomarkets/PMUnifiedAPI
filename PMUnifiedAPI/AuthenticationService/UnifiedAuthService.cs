@@ -27,7 +27,7 @@ namespace PMUnifiedAPI.AuthenticationService
             this._context = context;
         }
 
-        public async Task<Tuple<Users, Accounts, TokenHelper.TokenStatus>> AuthenticateUser(HttpContext context)
+        public async Task<(Users User, Accounts Account, TokenHelper.TokenStatus TokenStatus)> AuthenticateUser(HttpContext context)
         {
             var authHeader = context.Request.Headers["UnifiedAuth"].ToString();
 
@@ -39,11 +39,11 @@ namespace PMUnifiedAPI.AuthenticationService
 
                 var user = await GetUserFromToken(authHeader);
 
-                return new Tuple<Users, Accounts, TokenHelper.TokenStatus>(user, account, tokenStatus);
+                return (user, account, tokenStatus);
             }
             else
             {
-                return new Tuple<Users, Accounts, TokenHelper.TokenStatus>(null, null, TokenHelper.TokenStatus.Unknown);
+                return (default, default, TokenHelper.TokenStatus.Unknown);
             }
 
         }

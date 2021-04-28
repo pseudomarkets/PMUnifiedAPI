@@ -17,6 +17,6 @@ namespace PMUnifiedAPI.AuthenticationService
 {
     public interface IUnifiedAuthService
     {
-        public Task<Tuple<Users, Accounts, TokenHelper.TokenStatus>> AuthenticateUser(HttpContext context);
+        Task<(Users User, Accounts Account, TokenHelper.TokenStatus TokenStatus)> AuthenticateUser(HttpContext context);
     }
 }

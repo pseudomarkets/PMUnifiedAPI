@@ -30,5 +30,6 @@ namespace PMUnifiedAPI.Models
         public string InternalServiceUsername { get; set; }
         public string InternalServicePassword { get; set; }
         public string MarketDataServiceUrl { get; set; }
+        public bool ConsolidatedTradingPlatformEnabled { get; set; }
     }
 }
