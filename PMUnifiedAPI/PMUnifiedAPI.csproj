@@ -18,7 +18,8 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="3.1.4" />
     <PackageReference Include="NetMQ" Version="4.0.1.6" />
     <PackageReference Include="PMCommonApiModels" Version="1.0.4" />
-    <PackageReference Include="PMCommonEntities" Version="1.1.8" />
+    <PackageReference Include="PMCommonEntities" Version="1.2.1" />
+    <PackageReference Include="PMConsolidatedTradingPlatform.Client.Core" Version="1.0.1" />
     <PackageReference Include="PMDataSynchronizer" Version="1.0.6" />
     <PackageReference Include="PMMarketDataService.DataProvider.Client" Version="1.0.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="3.4.0" />

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using PMUnifiedAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using PMConsolidatedTradingPlatform.Client.Core.Implementation;
 using PMMarketDataService.DataProvider.Client.Implementation;
 using PMUnifiedAPI.AuthenticationService;
 using PMUnifiedAPI.Helpers;
@@ -51,6 +52,10 @@ namespace PMUnifiedAPI
                 Configuration.GetValue<string>("PMConfig:InternalServiceUsername"),
                 Configuration.GetValue<string>("PMConfig:InternalServicePassword"),
                 Configuration.GetValue<string>("PMConfig:MarketDataServiceUrl")));
+
+            // Inject Trading Platform Client
+            services.AddSingleton<TradingPlatformClient>(
+                new TradingPlatformClient(Configuration.GetValue<string>("PMConfig:NetMQServer")));
 
             // Add all other services
             services.AddHttpClient();
