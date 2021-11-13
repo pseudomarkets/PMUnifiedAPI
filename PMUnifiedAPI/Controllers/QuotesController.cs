@@ -104,6 +104,7 @@ namespace PMUnifiedAPI.Controllers
             {
                 var indices = await _marketDataClient.GetIndices();
                 var output = JsonConvert.SerializeObject(indices);
+                Response.ContentType = "application/json";
                 return Ok(output);
             }
             catch (Exception e)
